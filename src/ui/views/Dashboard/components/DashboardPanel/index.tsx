@@ -52,6 +52,7 @@ import {
   RcIconTransactionsCC,
   RcIconConvertDustCC,
   RcIconStakingCC,
+  RcIconLampCC,
 } from 'ui/assets/dashboard/panel';
 
 import { useThemeMode } from '@/ui/hooks/usePreference';
@@ -427,8 +428,6 @@ export const DashboardPanel: React.FC<{ onSettingClick?(): void }> = ({
     onOpenInDesktop?: () => void;
   };
 
-  const IconPerps = RcIconPerpsCC;
-
   const hiddenBalance = useRabbySelector((s) => s.preference.hiddenBalance);
 
   const {
@@ -607,7 +606,7 @@ export const DashboardPanel: React.FC<{ onSettingClick?(): void }> = ({
       isFullscreen: true,
     } as IPanelItem,
     perps: {
-      icon: IconPerps,
+      icon: RcIconPerpsCC,
       eventKey: 'Perps',
       iconClassName: 'icon-perps',
       subContent: perpsSubContentNode,
@@ -621,6 +620,14 @@ export const DashboardPanel: React.FC<{ onSettingClick?(): void }> = ({
         openPanelInDesktop('/desktop/perps');
       },
       // isFullscreen: true,
+    } as IPanelItem,
+    smartAutomations: {
+      icon: RcIconLampCC,
+      eventKey: 'Smart Automations',
+      content: 'Smart Automations',
+      onClick: () => {
+        history.push('/smart-automations');
+      },
     } as IPanelItem,
     searchDapp: {
       icon: RcIconSearchCC,
@@ -677,6 +684,7 @@ export const DashboardPanel: React.FC<{ onSettingClick?(): void }> = ({
       'transactions',
       'security',
       'perps',
+      'smartAutomations',
       'staking',
       'mobile',
       'dapps',
