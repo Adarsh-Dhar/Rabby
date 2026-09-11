@@ -68,6 +68,7 @@ import {
   whitelistService,
   OfflineChainsService,
   perpsService,
+  keeperhubService,
   transactionsService,
   feedbackService,
 } from './service';
@@ -188,6 +189,7 @@ async function restoreAppState() {
   await OfflineChainsService.init();
   await syncChainService.init();
   await perpsService.init();
+  await keeperhubService.init();
   await transactionsService.init();
   await feedbackService.init();
 

@@ -71,6 +71,7 @@ import { Bridge } from './Bridge';
 import { GasAccount } from './GasAccount';
 import { GnosisQueue } from './GnosisQueue';
 import Perps from './Perps/screen/home';
+import SmartAutomations from './SmartAutomations/screen/home';
 import { Guide } from './NewUserImport/Guide';
 import { CreateSeedPhrase } from './NewUserImport/CreateSeedPhrase';
 import { NewUserSetPassword } from './NewUserImport/SetPassword';
@@ -539,6 +540,9 @@ const Main = () => {
         </PrivateRoute>
         <PrivateRoute exact path="/perps">
           <Perps />
+        </PrivateRoute>
+        <PrivateRoute exact path="/smart-automations">
+          <SmartAutomations />
         </PrivateRoute>
         <PrivateRoute exact path="/perps/single-coin/:coin">
           <PerpsSingleCoin />

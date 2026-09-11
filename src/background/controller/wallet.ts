@@ -44,6 +44,7 @@ import {
   uninstalledService,
   OfflineChainsService,
   perpsService,
+  keeperhubService,
   miscService,
   feedbackService,
 } from 'background/service';
@@ -6969,6 +6970,114 @@ export class WalletController extends BaseController {
   setPerpsSelectedCoin = perpsService.setSelectedCoin;
   getPerpsSelectedCoin = perpsService.getSelectedCoin;
   getMarketSlippage = perpsService.getMarketSlippage;
+
+  // ---- KeeperHub Smart Automations ----
+  // The kh_* API key is entered once by the user and held only in the
+  // background persisted store (src/background/service/keeperhub.ts).
+  // It is never exposed to dapp-facing contexts.
+  setKeeperhubApiKey = (key: string) => {
+    keeperhubService.setApiKey(key);
+  };
+  getKeeperhubApiKeyStatus = () => Boolean(keeperhubService.getApiKey());
+  clearKeeperhubApiKey = () => keeperhubService.clearApiKey();
+
+  getKeeperhubWorkflows = async (address: string) => {
+    return keeperhubService.getWorkflows(address);
+  };
+
+  // Calls POST https://app.keeperhub.com/api/workflows, then persists the
+  // returned workflow id against the current address. Actual monitoring and
+  // execution happens on KeeperHub's infrastructure, not in this extension -
+  // this call only registers the workflow.
+  createKeeperhubWorkflow = async (params: {
+    address: string;
+    chainId: number;
+    type: 'liquidation-shield' | 'yield-harvester' | 'stop-loss';
+    name: string;
+    nodes: unknown[];
+    edges: unknown[];
+  }) => {
+    const apiKey = keeperhubService.getApiKey();
+    if (!apiKey) {
+      throw new Error('KeeperHub API key is not configured');
+    }
+
+    const res = await fetch('https://app.keeperhub.com/api/workflows', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: params.name,
+        nodes: params.nodes,
+        edges: params.edges,
+      }),
+    });
+
+    if (!res.ok) {
+      throw new Error(
+        `KeeperHub workflow creation failed: ${res.status} ${res.statusText}`
+      );
+    }
+
+    const workflow = await res.json();
+
+    keeperhubService.addWorkflow(params.address, {
+      workflowId: workflow.id,
+      type: params.type,
+      address: params.address,
+      chainId: params.chainId,
+      createdAt: Date.now(),
+      lastKnownStatus: 'active',
+    });
+
+    return workflow;
+  };
+
+  // GET /api/workflows/{id}/executions - refreshed on demand only, never
+  // polled from the background (see keeperhub.ts comments on why).
+  refreshKeeperhubWorkflowStatus = async (
+    address: string,
+    workflowId: string
+  ) => {
+    const apiKey = keeperhubService.getApiKey();
+    if (!apiKey) {
+      throw new Error('KeeperHub API key is not configured');
+    }
+
+    const res = await fetch(
+      `https://app.keeperhub.com/api/workflows/${workflowId}/executions`,
+      {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }
+    );
+
+    if (!res.ok) {
+      keeperhubService.updateWorkflowStatus(address, workflowId, 'error');
+      throw new Error(
+        `KeeperHub status fetch failed: ${res.status} ${res.statusText}`
+      );
+    }
+
+    const executions = await res.json();
+    keeperhubService.updateWorkflowStatus(address, workflowId, 'active');
+    return executions;
+  };
+
+  removeKeeperhubWorkflow = async (address: string, workflowId: string) => {
+    const apiKey = keeperhubService.getApiKey();
+    if (apiKey) {
+      // best-effort remote delete; local record is removed regardless so the
+      // UI never gets stuck on a dead workflow if the API call fails
+      await fetch(`https://app.keeperhub.com/api/workflows/${workflowId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${apiKey}` },
+      }).catch(() => undefined);
+    }
+    keeperhubService.removeWorkflow(address, workflowId);
+  };
+
   setMarketSlippage = perpsService.setMarketSlippage;
   getSoundEnabled = perpsService.getSoundEnabled;
   setSoundEnabled = perpsService.setSoundEnabled;
