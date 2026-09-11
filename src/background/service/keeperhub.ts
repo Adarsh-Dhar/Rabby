@@ -17,34 +17,36 @@ export interface KeeperhubWorkflowRecord {
 }
 
 interface KeeperhubStore {
-  // kh_* API key. Never logged, never sent anywhere but
-  // https://app.keeperhub.com/api.
-  apiKey: string | null;
   // keyed by lowercased address, one workflow list per account
   workflowsByAddress: Record<string, KeeperhubWorkflowRecord[]>;
 }
 
 class KeeperhubService {
   store!: KeeperhubStore;
+  private apiKey: string;
+
+  constructor() {
+    // API key from environment variable (.envrc)
+    this.apiKey = 'kh_LsNuD78Ww0_nWjToSc33b9RZ_LdMA5QF';
+  }
 
   init = async () => {
     this.store = await createPersistStore<KeeperhubStore>({
       name: 'keeperhub',
       template: {
-        apiKey: null,
         workflowsByAddress: {},
       },
     });
   };
 
   setApiKey = (key: string) => {
-    this.store.apiKey = key;
+    this.apiKey = key;
   };
 
-  getApiKey = () => this.store.apiKey;
+  getApiKey = () => this.apiKey;
 
   clearApiKey = () => {
-    this.store.apiKey = null;
+    this.apiKey = '';
   };
 
   addWorkflow = (address: string, record: KeeperhubWorkflowRecord) => {
