@@ -43,7 +43,7 @@ export const PerpsSettingsDrawer: React.FC<PerpsSettingsDrawerProps> = ({
 
   return (
     <Drawer
-      visible={visible}
+      open={visible}
       onClose={onClose}
       placement="right"
       width={400}

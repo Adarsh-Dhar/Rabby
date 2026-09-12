@@ -14,3 +14,21 @@ These invariants hold for every change. Reviewers must check them even when a PR
 - `broadcastToUI` events reach every window (popup, notification, tab). A listener must not treat a global event (e.g. `UNLOCK_WALLET`) as local user consent for a pending request in its own window.
 - Membership in a relaxation whitelist (e.g. `QUEUE_APPROVAL_COMPONENTS_WHITELIST`) means the component can coexist with other queued approvals; every member must be coexistence-safe.
 
+## KeeperHub MCP Integration
+
+This project includes a KeeperHub Model Context Protocol (MCP) server integration for AI-powered blockchain workflow generation. Key details:
+
+- **Configuration**: `.devin/mcp_config.json` (project) and `.devin/mcp_config.local.json` (local, gitignored)
+- **Service**: `src/background/service/keeperhubMCP.ts` - TypeScript wrapper for KeeperHub MCP API
+- **Types**: `src/background/service/keeperhubMCPTypes.ts` - Comprehensive type definitions
+- **Templates**: `src/ui/views/SmartAutomations/workflowTemplates.ts` - AI workflow generation functions
+- **Documentation**: `docs/keeperhub-mcp-integration.md` - Complete integration guide
+
+When working with KeeperHub features:
+- The MCP service shares API key storage with the existing `keeperhubService` for consistency
+- Workflow generation uses AI instead of manual JSON construction to avoid schema mismatches
+- All MCP operations include comprehensive error handling and validation
+- API keys should never be committed - use environment variables or local config files
+
+See the integration documentation for detailed API reference and usage examples.
+

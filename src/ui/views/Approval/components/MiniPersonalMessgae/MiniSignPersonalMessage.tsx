@@ -155,7 +155,7 @@ export const MiniPersonalMessageApproval = ({
         !supportedHardwareDirectSign(currentAccount?.type || '')) ? (
         <Modal
           transitionName=""
-          visible={isSigningLoading || isPreparingSign}
+          open={isSigningLoading || isPreparingSign}
           maskClosable={false}
           centered
           cancelText={null}

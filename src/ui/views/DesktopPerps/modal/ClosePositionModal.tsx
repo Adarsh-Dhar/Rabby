@@ -769,7 +769,7 @@ export const ClosePositionModal: React.FC<Props> = ({
       centered
       destroyOnClose
       closable
-      visible={visible}
+      open={visible}
       onCancel={onCancel}
       footer={null}
       width={400}

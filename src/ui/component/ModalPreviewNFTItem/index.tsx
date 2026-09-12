@@ -83,7 +83,7 @@ export default function ModalPreviewNFTItem({
   return (
     <PreviewModal
       {...props}
-      visible={!!nft}
+      open={!!nft}
       centered
       width={330}
       cancelText={null}

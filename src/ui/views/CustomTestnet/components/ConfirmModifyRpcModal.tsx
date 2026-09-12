@@ -30,7 +30,7 @@ export const ConfirmModifyRpcModal = ({
   }, [chainId]);
   return (
     <Modal
-      visible={visible}
+      open={visible}
       onCancel={onCancel}
       bodyStyle={{
         padding: 0,

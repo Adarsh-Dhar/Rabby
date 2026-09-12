@@ -1102,7 +1102,7 @@ export const EditTpSlModal: React.FC<Props> = ({
       centered
       destroyOnClose
       closable
-      visible={visible}
+      open={visible}
       onCancel={onCancel}
       footer={null}
       width={400}

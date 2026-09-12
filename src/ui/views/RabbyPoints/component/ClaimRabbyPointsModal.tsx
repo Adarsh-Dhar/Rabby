@@ -75,7 +75,7 @@ export const ClaimRabbyPointsModal = (
   const { visible, onCancel, ...other } = props;
   return (
     <StyledModal
-      visible={visible}
+      open={visible}
       title={null}
       onCancel={onCancel}
       destroyOnClose

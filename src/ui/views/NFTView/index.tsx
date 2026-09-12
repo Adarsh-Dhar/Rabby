@@ -170,7 +170,7 @@ export const NFTView: React.FC<{
       </div>
 
       <Modal
-        visible={modalVisible}
+        open={modalVisible}
         centered
         width={336}
         cancelText={null}

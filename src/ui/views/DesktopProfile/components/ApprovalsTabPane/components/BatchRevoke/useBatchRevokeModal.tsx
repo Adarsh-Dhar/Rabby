@@ -59,7 +59,7 @@ export const useBatchRevokeModal = ({
   const node = React.useMemo(() => {
     return (
       <Modal
-        visible={visible}
+        open={visible}
         className="confirm-revoke-modal"
         closable={false}
         maskClosable={true}

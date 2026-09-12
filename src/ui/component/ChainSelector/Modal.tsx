@@ -233,7 +233,7 @@ const ChainSelectorModal = ({
         height={height}
         closable={showClosableIcon && !!title}
         placement={'bottom'}
-        visible={visible}
+        open={visible}
         onClose={handleCancel}
         className={clsx(
           'custom-popup is-support-darkmode is-new',

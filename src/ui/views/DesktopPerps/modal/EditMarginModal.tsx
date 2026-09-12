@@ -217,7 +217,7 @@ export const EditMarginModal: React.FC<EditMarginPopupProps> = ({
         backdropFilter: 'blur(8px)',
         backgroundColor: 'rgba(0, 0, 0, 0.3)',
       }}
-      visible={visible}
+      open={visible}
       onCancel={onCancel}
       footer={null}
       width={400}

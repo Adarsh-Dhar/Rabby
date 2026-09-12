@@ -57,7 +57,7 @@ export const MarginModeModal: React.FC<MarginModeModalProps> = ({
 
   return (
     <Modal
-      visible={visible}
+      open={visible}
       onCancel={onCancel}
       footer={null}
       width={400}

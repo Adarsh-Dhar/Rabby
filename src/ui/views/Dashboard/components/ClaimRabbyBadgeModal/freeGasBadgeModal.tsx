@@ -534,7 +534,7 @@ export const ClaimRabbyFreeGasBadgeModal = ({
   return (
     <StyledModal
       className="modal-support-darkmode"
-      visible={visible}
+      open={visible}
       title={null}
       onCancel={onCancel}
       destroyOnClose

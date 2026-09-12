@@ -576,6 +576,92 @@ const SwitchLangModal = ({
   );
 };
 
+const KeeperhubModal = ({
+  visible,
+  onFinish,
+  onCancel,
+}: {
+  visible: boolean;
+  onFinish(): void;
+  onCancel(): void;
+}) => {
+  const { useForm } = Form;
+  const [isVisible, setIsVisible] = useState(false);
+  const [form] = useForm<{ apiKey: string }>();
+  const wallet = useWallet();
+  const { t } = useTranslation();
+
+  const handleSubmit = async ({ apiKey }: { apiKey: string }) => {
+    try {
+      await wallet.setKeeperhubApiKey(apiKey);
+      setIsVisible(false);
+      setTimeout(() => {
+        onFinish();
+      }, 500);
+    } catch (error) {
+      message.error(
+        (error as Error)?.message || 'Failed to set KeeperHub API key'
+      );
+    }
+  };
+
+  const handleCancel = () => {
+    setIsVisible(false);
+    setTimeout(() => {
+      onCancel();
+    }, 500);
+  };
+
+  useEffect(() => {
+    setTimeout(() => {
+      setIsVisible(visible);
+    }, 100);
+  }, [visible]);
+
+  return (
+    <div
+      className={clsx('openapi-modal', { show: isVisible, hidden: !visible })}
+    >
+      <PageHeader forceShowBack onBack={handleCancel}>
+        KeeperHub API Key
+      </PageHeader>
+      <Form onFinish={handleSubmit} form={form}>
+        <Form.Item
+          name="apiKey"
+          rules={[
+            {
+              required: true,
+              message: 'Please enter your KeeperHub API key',
+            },
+          ]}
+        >
+          <Input
+            className="popup-input"
+            placeholder="Enter your KeeperHub API key"
+            size="large"
+            autoFocus
+            spellCheck={false}
+          />
+        </Form.Item>
+        <div className="text-13 text-r-neutral-body mb-16">
+          Connect your KeeperHub API key to enable smart automations like
+          liquidation shields and yield harvesters.
+        </div>
+        <div className="flex justify-center mt-24 popup-footer">
+          <Button
+            type="primary"
+            size="large"
+            htmlType="submit"
+            className="w-[200px]"
+          >
+            {t('page.dashboard.settings.save')}
+          </Button>
+        </div>
+      </Form>
+    </div>
+  );
+};
+
 // const ClaimRabbyBadge = ({ onClick }: { onClick: () => void }) => {
 //   const { t } = useTranslation();
 //   return (
@@ -637,6 +723,8 @@ const SettingsInner = ({
   const [perpsWidgetEnabled, setPerpsWidgetEnabled] = useState(false);
   const [perpsWidgetBusy, setPerpsWidgetBusy] = useState(false);
   const [dataAnalysisPending, setDataAnalysisPending] = useState(false);
+  const [showKeeperhubModal, setShowKeeperhubModal] = useState(false);
+  const [keeperhubApiKey, setKeeperhubApiKey] = useState('');
 
   const [perpsIncludeWatchForTest, setPerpsIncludeWatchForTest] = useState(
     () => localStorage.getItem(PERPS_TEST_INCLUDE_WATCH_KEY) === '1'
@@ -805,6 +893,16 @@ const SettingsInner = ({
       },
     });
   };
+
+  useEffect(() => {
+    const loadKeeperhubStatus = async () => {
+      const hasKey = await wallet.getKeeperhubApiKeyStatus();
+      if (hasKey) {
+        setKeeperhubApiKey('••••••••••••');
+      }
+    };
+    loadKeeperhubStatus();
+  }, [wallet]);
 
   const { value: hasNewVersion = false } = useAsync(async () => {
     const data = await wallet.openapi.getLatestVersion();
@@ -1093,6 +1191,26 @@ const SettingsInner = ({
               disabled={dataAnalysisPending}
             />
           ),
+        },
+        {
+          leftIcon: RcIconPerps,
+          leftIconClassName: 'text-r-neutral-body',
+          content: 'KeeperHub API Key',
+          rightIcon: (
+            <>
+              <span
+                className="text-14 mr-[8px] text-r-neutral-foot"
+                role="button"
+              >
+                {keeperhubApiKey || 'Not connected'}
+              </span>
+              <ThemeIcon
+                src={RcIconArrowRight}
+                className="icon icon-arrow-right"
+              />
+            </>
+          ),
+          onClick: () => setShowKeeperhubModal(true),
         },
         {
           leftIcon: RcIconCustomTestnet,
@@ -1751,6 +1869,21 @@ const SettingsInner = ({
         visible={isShowLangModal}
         onFinish={() => setIsShowLangModal(false)}
         onCancel={() => setIsShowLangModal(false)}
+      />
+      <KeeperhubModal
+        visible={showKeeperhubModal}
+        onFinish={() => {
+          setShowKeeperhubModal(false);
+          // Refresh the API key status after setting
+          const loadKeeperhubStatus = async () => {
+            const hasKey = await wallet.getKeeperhubApiKeyStatus();
+            if (hasKey) {
+              setKeeperhubApiKey('••••••••••••');
+            }
+          };
+          loadKeeperhubStatus();
+        }}
+        onCancel={() => setShowKeeperhubModal(false)}
       />
       <CurrencyModal
         visible={isShowCurrencyModal}

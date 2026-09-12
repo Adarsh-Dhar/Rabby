@@ -39,7 +39,7 @@ export const EcologyNoticeModal = ({
 
   return (
     <StyledModal
-      visible={visible}
+      open={visible}
       centered
       width={360}
       cancelText={null}

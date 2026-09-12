@@ -82,7 +82,7 @@ const EditModal = ({
     <Drawer
       className="edit-contact-modal-with-remove custom-popup is-support-darkmode"
       title={t('component.Contact.EditModal.title')}
-      visible={visible}
+      open={visible}
       onClose={onCancel}
       placement="bottom"
       height="224px"

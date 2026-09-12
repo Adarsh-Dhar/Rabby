@@ -88,7 +88,7 @@ export const LeverageModal: React.FC<LeverageModalProps> = ({
 
   return (
     <Modal
-      visible={visible}
+      open={visible}
       onCancel={onCancel}
       footer={null}
       width={400}

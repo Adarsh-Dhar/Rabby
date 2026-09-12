@@ -288,7 +288,7 @@ export const ScreenshotContextMenu = () => {
         centered
         className="rabby-screenshot-modal modal-support-darkmode"
         footer={false}
-        visible={modalVisible}
+        open={modalVisible}
         width={360}
         zIndex={SCREENSHOT_MODAL_Z_INDEX}
         onCancel={handleCancel}

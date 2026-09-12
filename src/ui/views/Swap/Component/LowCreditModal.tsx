@@ -75,7 +75,7 @@ export const LowCreditModal = ({
   }
   return (
     <Modal
-      visible={visible}
+      open={visible}
       width={320}
       cancelText={null}
       okText={null}

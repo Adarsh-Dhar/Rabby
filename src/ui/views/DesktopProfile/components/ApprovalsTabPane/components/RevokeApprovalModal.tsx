@@ -505,7 +505,7 @@ export const RevokeApprovalModal = (props: {
     <ModalStyled
       centered
       width={480}
-      visible={visible}
+      open={visible}
       onCancel={onClose}
       className={clsx(
         'revoke-approval-modal modal-support-darkmode',

@@ -23,3 +23,6 @@ src/manifest/chrome-mv3/manifest.local.json
 
 # Local agent specs/plans — not part of the repo
 docs/superpowers/
+
+# Local MCP configuration with API keys
+.devin/mcp_config.local.json

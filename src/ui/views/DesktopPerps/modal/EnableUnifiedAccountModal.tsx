@@ -38,7 +38,7 @@ export const EnableUnifiedAccountModal: React.FC<EnableUnifiedAccountModalProps>
 
   return (
     <Modal
-      visible={visible}
+      open={visible}
       onCancel={loading ? undefined : onCancel}
       footer={null}
       width={400}

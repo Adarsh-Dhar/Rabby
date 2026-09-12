@@ -51,7 +51,7 @@ export const DesktopTokenLabel: React.FC<Props> = ({
       </span>
       {isNft ? (
         <Modal
-          visible={visible}
+          open={visible}
           centered
           width={336}
           cancelText={null}

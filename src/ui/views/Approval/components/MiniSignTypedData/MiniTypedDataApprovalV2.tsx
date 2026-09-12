@@ -125,7 +125,7 @@ export const MiniTypedDataApprovalV2: React.FC<{
           />
         </Popup>
         <Modal
-          visible={showPopup}
+          open={showPopup}
           onClose={() => handleClose()}
           maskClosable={false}
           closable={false}

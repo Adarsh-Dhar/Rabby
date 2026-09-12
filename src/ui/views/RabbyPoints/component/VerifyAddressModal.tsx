@@ -30,7 +30,7 @@ export const ClaimRabbyVerifyModal = ({
 }) => {
   return (
     <StyledModal
-      visible={visible}
+      open={visible}
       title={null}
       onCancel={onCancel}
       destroyOnClose

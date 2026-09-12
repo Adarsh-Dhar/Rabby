@@ -19,6 +19,9 @@ const createStyledComponentsTransformer = require('typescript-plugin-styled-comp
 
 const isEnvDevelopment = process.env.NODE_ENV !== 'production';
 const useForkTsChecker = process.env.FORK_TS_CHECKER === 'enable';
+// Skip ESLint during webpack compilation to reduce memory pressure.
+// Run `yarn lint` separately if you need lint checking.
+const skipEslint = process.env.SKIP_ESLINT === '1' || true;
 
 const paths = require('./paths');
 
@@ -151,6 +154,7 @@ const config = {
           {
             loader: 'ts-loader',
             options: {
+              transpileOnly: true,
               ...(useForkTsChecker ? { transpileOnly: true } : {}),
               getCustomTransformers: () => ({
                 before: [
@@ -256,16 +260,20 @@ const config = {
     ],
   },
   plugins: [
-    new ESLintWebpackPlugin({
-      extensions: ['ts', 'tsx', 'js', 'jsx'],
-      ...(useForkTsChecker ? { lintDirtyModulesOnly: true } : {}),
-    }),
+    ...(skipEslint
+      ? []
+      : [
+          new ESLintWebpackPlugin({
+            extensions: ['ts', 'tsx', 'js', 'jsx'],
+            ...(useForkTsChecker ? { lintDirtyModulesOnly: true } : {}),
+          }),
+        ]),
     ...(useForkTsChecker
       ? [
           new ForkTsCheckerWebpackPlugin({
             async: isEnvDevelopment,
             typescript: {
-              memoryLimit: 2048,
+              memoryLimit: 1024,
             },
           }),
         ]

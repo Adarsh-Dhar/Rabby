@@ -298,7 +298,7 @@ export const EditTpSlTag: React.FC<EditTpSlTagProps> = ({
       </div>
 
       <Modal
-        visible={modalVisible}
+        open={modalVisible}
         onCancel={() => !loading && setModalVisible(false)}
         width={352}
         footer={null}

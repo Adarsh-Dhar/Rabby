@@ -259,7 +259,7 @@ const CreatePassword = () => {
       <Drawer
         placement="bottom"
         width={'100%'}
-        visible={visible}
+        open={visible}
         onClose={toggleVisible}
         className={clsx(drawClassName, 'is-support-darkmode')}
         contentWrapperStyle={{

@@ -134,7 +134,7 @@ export const OrderConfirmModal: React.FC<OrderConfirmModalProps> = ({
 
   return (
     <Modal
-      visible={visible}
+      open={visible}
       onCancel={onCancel}
       width={400}
       centered

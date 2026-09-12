@@ -192,7 +192,7 @@ export const ChainSelectorLargeModal = ({
     <Modal
       width={400}
       footer={null}
-      visible={visible}
+      open={visible}
       onCancel={handleCancel}
       className={clsx(
         'custom-popup is-support-darkmode',

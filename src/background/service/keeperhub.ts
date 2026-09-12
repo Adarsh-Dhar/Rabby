@@ -19,6 +19,7 @@ export interface KeeperhubWorkflowRecord {
 interface KeeperhubStore {
   // keyed by lowercased address, one workflow list per account
   workflowsByAddress: Record<string, KeeperhubWorkflowRecord[]>;
+  apiKey: string;
 }
 
 class KeeperhubService {
@@ -26,7 +27,7 @@ class KeeperhubService {
   private apiKey: string;
 
   constructor() {
-    // API key from environment variable (.envrc)
+    // Set default API key immediately, will be updated from persisted store in init()
     this.apiKey = 'kh_LsNuD78Ww0_nWjToSc33b9RZ_LdMA5QF';
   }
 
@@ -35,18 +36,27 @@ class KeeperhubService {
       name: 'keeperhub',
       template: {
         workflowsByAddress: {},
+        apiKey: 'kh_LsNuD78Ww0_nWjToSc33b9RZ_LdMA5QF',
       },
     });
+    // Update from store if available, otherwise keep the default
+    if (this.store.apiKey) {
+      this.apiKey = this.store.apiKey;
+    } else {
+      this.store.apiKey = this.apiKey;
+    }
   };
 
   setApiKey = (key: string) => {
     this.apiKey = key;
+    this.store.apiKey = key;
   };
 
   getApiKey = () => this.apiKey;
 
   clearApiKey = () => {
     this.apiKey = '';
+    this.store.apiKey = '';
   };
 
   addWorkflow = (address: string, record: KeeperhubWorkflowRecord) => {

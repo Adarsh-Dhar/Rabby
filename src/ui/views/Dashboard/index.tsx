@@ -203,7 +203,7 @@ const Dashboard = () => {
         <StablecoinSwapPopup />
       </div>
       <Modal
-        visible={firstNotice && updateContent}
+        open={firstNotice && updateContent}
         title={t('page.dashboard.home.whatsNew')}
         className="first-notice"
         onCancel={() => {

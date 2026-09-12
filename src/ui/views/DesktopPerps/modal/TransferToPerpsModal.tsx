@@ -181,7 +181,7 @@ export const TransferToPerpsModal: React.FC<TransferToPerpsModalProps> = ({
 
   return (
     <Modal
-      visible={visible}
+      open={visible}
       onCancel={submitting ? undefined : onClose}
       footer={null}
       centered

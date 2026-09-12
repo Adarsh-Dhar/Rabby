@@ -45,6 +45,7 @@ import {
   OfflineChainsService,
   perpsService,
   keeperhubService,
+  keeperhubMCPService,
   miscService,
   feedbackService,
 } from 'background/service';
@@ -92,6 +93,10 @@ import {
   ContractAddress,
   UserData,
 } from '@rabby-wallet/rabby-security-engine/dist/rules';
+import type {
+  MCPWorkflowNode,
+  MCPWorkflowEdge,
+} from 'background/service/keeperhubMCP';
 import DisplayKeyring from '../service/keyring/display';
 import provider from './provider';
 import { WalletConnectKeyring } from '@rabby-wallet/eth-walletconnect-keyring';
@@ -7002,37 +7007,65 @@ export class WalletController extends BaseController {
       throw new Error('KeeperHub API key is not configured');
     }
 
-    const res = await fetch('https://app.keeperhub.com/api/workflows', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        name: params.name,
-        nodes: params.nodes,
-        edges: params.edges,
-      }),
-    });
-
-    if (!res.ok) {
+    // KeeperHub's API rejects requests originating from browser extensions
+    // (chrome-extension:// origin). Fail fast with a clear message rather than
+    // letting the request through and getting a cryptic 403 "Invalid origin".
+    if (
+      typeof location !== 'undefined' &&
+      location.protocol === 'chrome-extension:'
+    ) {
       throw new Error(
-        `KeeperHub workflow creation failed: ${res.status} ${res.statusText}`
+        'KEEPERHUB_EXTENSION_ORIGIN: KeeperHub workflows cannot be created directly from the extension. Use the KeeperHub web app at app.keeperhub.com to manage workflows.'
       );
     }
 
-    const workflow = await res.json();
+    try {
+      const res = await fetch('https://app.keeperhub.com/api/workflows', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: params.name,
+          nodes: params.nodes,
+          edges: params.edges,
+        }),
+        credentials: 'omit',
+      });
 
-    keeperhubService.addWorkflow(params.address, {
-      workflowId: workflow.id,
-      type: params.type,
-      address: params.address,
-      chainId: params.chainId,
-      createdAt: Date.now(),
-      lastKnownStatus: 'active',
-    });
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error('KeeperHub API error:', res.status, errorText);
 
-    return workflow;
+        // Origin blocked by KeeperHub CORS policy
+        if (res.status === 403 && errorText.includes('Invalid origin')) {
+          throw new Error(
+            'KEEPERHUB_EXTENSION_ORIGIN: KeeperHub API does not allow requests from browser extensions. Use the KeeperHub web app at app.keeperhub.com to manage workflows.'
+          );
+        }
+
+        throw new Error(
+          `KeeperHub workflow creation failed: ${res.status} ${res.statusText}. ${errorText}`
+        );
+      }
+
+      const workflow = await res.json();
+
+      keeperhubService.addWorkflow(params.address, {
+        workflowId: workflow.id,
+        type: params.type,
+        address: params.address,
+        chainId: params.chainId,
+        createdAt: Date.now(),
+        lastKnownStatus: 'active',
+      });
+
+      return workflow;
+    } catch (error) {
+      console.error('KeeperHub workflow creation error:', error);
+      throw error;
+    }
   };
 
   // GET /api/workflows/{id}/executions - refreshed on demand only, never
@@ -7050,6 +7083,7 @@ export class WalletController extends BaseController {
       `https://app.keeperhub.com/api/workflows/${workflowId}/executions`,
       {
         headers: { Authorization: `Bearer ${apiKey}` },
+        credentials: 'omit',
       }
     );
 
@@ -7073,9 +7107,40 @@ export class WalletController extends BaseController {
       await fetch(`https://app.keeperhub.com/api/workflows/${workflowId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${apiKey}` },
+        credentials: 'omit',
       }).catch(() => undefined);
     }
     keeperhubService.removeWorkflow(address, workflowId);
+  };
+
+  // MCP-based workflow generation methods
+  generateKeeperhubWorkflow = async (params: {
+    prompt: string;
+    context?: Record<string, unknown>;
+  }) => {
+    return keeperhubMCPService.generateWorkflow(params);
+  };
+
+  validateKeeperhubWorkflow = async (params: {
+    nodes: MCPWorkflowNode[];
+    edges: MCPWorkflowEdge[];
+  }) => {
+    return keeperhubMCPService.validateWorkflow(params);
+  };
+
+  executeKeeperhubWorkflow = async (workflowId: string) => {
+    return keeperhubMCPService.executeWorkflow(workflowId);
+  };
+
+  getKeeperhubExecutionStatus = async (executionId: string) => {
+    return keeperhubMCPService.getExecution(executionId);
+  };
+
+  listKeeperhubWorkflows = async (params?: {
+    projectId?: string;
+    tagId?: string;
+  }) => {
+    return keeperhubMCPService.listWorkflows(params);
   };
 
   setMarketSlippage = perpsService.setMarketSlippage;

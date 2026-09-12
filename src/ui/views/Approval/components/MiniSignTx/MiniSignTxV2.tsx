@@ -690,7 +690,7 @@ const MiniSignTxV2 = ({ isDesktop }: { isDesktop?: boolean }) => {
           <Modal
             getContainer={config.getContainer}
             transitionName=""
-            visible={true}
+            open={true}
             maskClosable={false}
             centered
             cancelText={null}
@@ -728,7 +728,7 @@ const MiniSignTxV2 = ({ isDesktop }: { isDesktop?: boolean }) => {
           />
         </Popup>
         <Modal
-          visible={visible}
+          open={visible}
           onClose={handleCancel}
           maskClosable={!loading}
           closable={false}
@@ -971,7 +971,7 @@ const MiniSignTxV2 = ({ isDesktop }: { isDesktop?: boolean }) => {
         <Modal
           getContainer={config?.getContainer}
           transitionName=""
-          visible={true}
+          open={true}
           maskClosable={false}
           centered
           cancelText={null}

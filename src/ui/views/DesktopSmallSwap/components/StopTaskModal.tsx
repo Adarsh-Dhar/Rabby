@@ -21,7 +21,7 @@ export const StopTaskModal: React.FC<{
   const { t } = useTranslation();
   return (
     <Modal
-      visible={visible}
+      open={visible}
       footer={null}
       width={480}
       centered

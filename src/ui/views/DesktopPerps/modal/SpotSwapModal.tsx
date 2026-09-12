@@ -245,7 +245,7 @@ export const SpotSwapModal: React.FC<SpotSwapModalProps> = ({
 
   return (
     <Modal
-      visible={visible}
+      open={visible}
       onCancel={submitting ? undefined : onClose}
       footer={null}
       centered

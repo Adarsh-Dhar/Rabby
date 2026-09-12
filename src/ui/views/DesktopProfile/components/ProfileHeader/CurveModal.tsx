@@ -123,7 +123,7 @@ export const CurveModal: React.FC<{
       <Modal
         className="global-curve-modal"
         width={704}
-        visible={visible}
+        open={visible}
         footer={null}
         centered
         closable={false}

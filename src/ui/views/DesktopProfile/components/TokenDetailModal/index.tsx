@@ -52,7 +52,7 @@ export const TokenDetailModal: React.FC<TokenDetailModalProps> = ({
 
   return (
     <Modal
-      visible={visible}
+      open={visible}
       onCancel={onClose}
       width={403}
       title={null}

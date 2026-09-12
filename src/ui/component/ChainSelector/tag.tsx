@@ -60,7 +60,7 @@ const ChainSelector = ({
       {!readonly && (
         <Modal
           value={value}
-          visible={showSelectorModal}
+          open={showSelectorModal}
           onChange={handleChange}
           onCancel={handleCancel}
           supportChains={supportChains}

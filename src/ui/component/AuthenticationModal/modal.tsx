@@ -73,7 +73,7 @@ const AuthenticationModal: React.FC<AuthenticationModalProps> = ({
 
   return (
     <Modal
-      visible={visible}
+      open={visible}
       centered
       width={400}
       onCancel={closeAndReject}

@@ -96,7 +96,7 @@ export const EditMarketSlippage: React.FC<EditMarketSlippageProps> = ({
 
   return (
     <Modal
-      visible={visible}
+      open={visible}
       onCancel={onCancel}
       footer={null}
       width={400}

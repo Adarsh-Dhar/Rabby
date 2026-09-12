@@ -84,7 +84,7 @@ export const SelectAddressModal: React.FC<Props> = ({
 
   return (
     <ModalStyled
-      visible={visible}
+      open={visible}
       onCancel={onClose}
       onOk={() => onConfirm?.(selected)}
       width={400}

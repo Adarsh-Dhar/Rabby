@@ -44,7 +44,7 @@ export const AddAddressModal: React.FC = () => {
 
   return (
     <Modal
-      visible={state.visible}
+      open={state.visible}
       onCancel={() => {
         setAddAddress({ visible: false, importType: '' });
       }}

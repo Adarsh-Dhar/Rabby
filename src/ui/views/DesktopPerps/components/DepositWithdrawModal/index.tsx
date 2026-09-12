@@ -183,7 +183,7 @@ export const DepositWithdrawModal: React.FC<DepositWithdrawModalProps> = ({
 
   return (
     <Modal
-      visible={visible}
+      open={visible}
       onCancel={onCancel}
       footer={null}
       width={400}

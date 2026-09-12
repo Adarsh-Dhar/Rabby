@@ -26,5 +26,6 @@ export { default as uninstalledService } from './uninstalled';
 export { default as OfflineChainsService } from './offlineChain';
 export { default as perpsService } from './perps';
 export { default as keeperhubService } from './keeperhub';
+export { default as keeperhubMCPService } from './keeperhubMCP';
 export { default as miscService } from './misc';
 export { default as feedbackService } from './feedback';

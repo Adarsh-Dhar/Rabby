@@ -34,7 +34,7 @@ export const HistoryList = ({
   return (
     <div className="overflow-auto h-full" ref={ref}>
       <Modal
-        visible={!!focusingHistoryItem}
+        open={!!focusingHistoryItem}
         // View Message
         title={t('page.transactions.modalViewMessage.title')}
         className="view-tx-message-modal"
