@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { parseUnits } from 'viem';
 import { PageHeader } from '@/ui/component';
 import { useWallet } from '@/ui/utils';
 import { useCurrentAccount } from '@/ui/hooks/backgroundState/useAccount';
@@ -7,6 +8,9 @@ import {
   buildLiquidationShieldWorkflow,
   buildYieldHarvesterWorkflow,
   buildStopLossWorkflow,
+  scopeApproveNodeAmounts,
+  USDC_ADDRESS,
+  MAX_UINT256,
 } from '../workflowTemplates';
 import {
   WorkflowConsentModal,
@@ -14,6 +18,12 @@ import {
 } from '../components/WorkflowConsentModal';
 import { ExecutionHistory } from '../components/ExecutionHistory';
 import { useAaveHealthFactor } from '../hooks/useAaveHealthFactor';
+import {
+  useAaveForkPosition,
+  useLidoPosition,
+  useCowOpenOrders,
+  SPARK_POOL_ADDRESS,
+} from '../hooks/usePositions';
 
 interface WorkflowRow {
   workflowId: string;
@@ -35,33 +45,48 @@ interface AutomationConfig {
   label: string;
   build: (
     address: string,
-    stopLossParams?: StopLossParams
+    stopLossParams?: StopLossParams,
+    approveAmount?: string
   ) => Promise<{ nodes: any[]; edges: any[] }>;
   summary: (stopLossParams?: StopLossParams) => WorkflowConsentSummary;
   // Stop-loss needs a small form filled in before we can build the workflow.
   needsForm?: boolean;
+  // Token being approved for this automation's approve node, if any. Used to
+  // drive the scoped-amount control in the consent modal — omit for
+  // automations (like yield-harvester) that don't spend the user's tokens.
+  approveToken?: (stopLossParams?: StopLossParams) => string | undefined;
 }
 
 const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
   'liquidation-shield': {
     label: 'Liquidation Shield (HF < 1.15)',
-    build: (address) =>
-      buildLiquidationShieldWorkflow({ address, healthFactorThreshold: 1.15 }),
+    build: (address, _stopLossParams, approveAmount) =>
+      buildLiquidationShieldWorkflow({
+        address,
+        healthFactorThreshold: 1.15,
+        approveAmount,
+      }),
+    approveToken: () => USDC_ADDRESS,
     summary: () => ({
       protocol: 'Aave V3',
       action: 'Approve + repay debt',
       maxAmount: 'Full USDC debt balance (unlimited approval)',
       triggerCondition: 'Health Factor < 1.15',
       chain: 'Ethereum',
+      tokenSymbol: 'USDC',
     }),
   },
   'yield-harvester': {
     label: 'Yield Harvester (Aave rewards)',
+    // No approveToken: this only calls claimRewards(to: yourAddress) — it
+    // pays rewards out to you, it doesn't spend an allowance, so there's
+    // nothing to scope here. (It also doesn't currently re-supply/compound
+    // the claimed rewards despite the label — see workflowTemplates.ts.)
     build: (address) =>
       buildYieldHarvesterWorkflow({ address, protocols: ['aave-v3'] }),
     summary: () => ({
       protocol: 'Aave V3',
-      action: 'Claim + compound rewards',
+      action: 'Claim rewards to your wallet',
       maxAmount: 'All accrued rewards above gas threshold',
       triggerCondition: 'Rewards > gas-efficient threshold',
       chain: 'Ethereum',
@@ -70,7 +95,8 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
   'stop-loss': {
     label: 'Stop-Loss (Uniswap v3)',
     needsForm: true,
-    build: (address, stopLossParams) => {
+    approveToken: (stopLossParams) => stopLossParams?.tokenAddress,
+    build: (address, stopLossParams, approveAmount) => {
       if (!stopLossParams) {
         throw new Error('Stop-loss requires token, threshold, and target token');
       }
@@ -79,6 +105,7 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
         tokenAddress: stopLossParams.tokenAddress,
         thresholdPrice: stopLossParams.thresholdPrice,
         targetToken: stopLossParams.targetToken,
+        approveAmount,
       });
     },
     summary: (stopLossParams) => ({
@@ -91,6 +118,7 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
           }`
         : 'Price below threshold',
       chain: 'Ethereum',
+      tokenSymbol: 'the watched token',
     }),
   },
 };
@@ -113,6 +141,18 @@ const SmartAutomations = () => {
     edges: any[];
   } | null>(null);
 
+  // Scoped-approval state for the consent modal. `decimals` is fetched for
+  // whichever token the pending automation approves, so the human-entered
+  // amount can be converted to the raw base-unit string the approve node
+  // needs. Defaults to unlimited=true is intentionally NOT the default —
+  // the person has to actively opt into unlimited approval.
+  const [approveDecimals, setApproveDecimals] = useState<number | null>(null);
+  const [approveAmountInput, setApproveAmountInput] = useState('');
+  const [unlimitedApproval, setUnlimitedApproval] = useState(false);
+  const [approveAmountError, setApproveAmountError] = useState<string | null>(
+    null
+  );
+
   // Stop-loss form state
   const [stopLossForm, setStopLossForm] = useState<StopLossParams>({
     tokenAddress: '',
@@ -122,6 +162,13 @@ const SmartAutomations = () => {
   const [showStopLossForm, setShowStopLossForm] = useState(false);
 
   const healthFactorData = useAaveHealthFactor(account?.address);
+  const sparkData = useAaveForkPosition(
+    account?.address,
+    SPARK_POOL_ADDRESS,
+    1
+  );
+  const lidoData = useLidoPosition(account?.address);
+  const cowData = useCowOpenOrders(account?.address);
 
   const load = useCallback(async () => {
     if (!account?.address) return;
@@ -137,6 +184,53 @@ const SmartAutomations = () => {
     load();
   }, [load]);
 
+  // Once a workflow is staged for consent, look up the decimals of whatever
+  // token its approve node would spend, so the amount input in the modal can
+  // work in human units instead of raw base units.
+  useEffect(() => {
+    if (!pendingType || !account?.address) return;
+    const tokenAddress = AUTOMATIONS[pendingType].approveToken?.(
+      pendingType === 'stop-loss' ? stopLossForm : undefined
+    );
+    if (!tokenAddress) {
+      setApproveDecimals(null);
+      return;
+    }
+    let cancelled = false;
+    wallet
+      .getErc20DecimalsAndBalance({
+        address: account.address,
+        tokenAddress,
+        chainId: 1,
+      })
+      .then((res) => {
+        if (!cancelled) setApproveDecimals(res.decimals);
+      })
+      .catch(() => {
+        // If decimals can't be read (bad address, RPC error), fall back to
+        // requiring the unlimited checkbox rather than guessing a decimals
+        // value — guessing here could silently under- or over-scope by
+        // orders of magnitude.
+        if (!cancelled) setApproveDecimals(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pendingType, account?.address, wallet, stopLossForm]);
+
+  useEffect(() => {
+    if (!approveAmountInput || unlimitedApproval) {
+      setApproveAmountError(null);
+      return;
+    }
+    const n = Number(approveAmountInput);
+    if (!Number.isFinite(n) || n <= 0) {
+      setApproveAmountError('Enter a positive amount');
+    } else {
+      setApproveAmountError(null);
+    }
+  }, [approveAmountInput, unlimitedApproval]);
+
   const handlePrepareAutomation = useCallback(
     async (type: AutomationType, stopLossParams?: StopLossParams) => {
       if (!account?.address) return;
@@ -147,6 +241,8 @@ const SmartAutomations = () => {
         );
         setPendingType(type);
         setPendingWorkflow(built);
+        setApproveAmountInput('');
+        setUnlimitedApproval(false);
         setShowConsent(true);
       } catch (e) {
         message.error((e as Error).message);
@@ -181,6 +277,31 @@ const SmartAutomations = () => {
 
   const handleConfirmCreate = useCallback(async () => {
     if (!account?.address || !pendingWorkflow || !pendingType) return;
+
+    const approveToken = AUTOMATIONS[pendingType].approveToken?.(
+      pendingType === 'stop-loss' ? stopLossForm : undefined
+    );
+
+    let nodesToSubmit = pendingWorkflow.nodes;
+    if (approveToken) {
+      if (!unlimitedApproval) {
+        if (approveDecimals === null) {
+          message.error(
+            "Couldn't verify this token's decimals — check the address or use unlimited approval."
+          );
+          return;
+        }
+        if (!approveAmountInput || approveAmountError) {
+          message.error('Enter a valid approval amount, or allow unlimited approval.');
+          return;
+        }
+      }
+      const rawAmount = unlimitedApproval
+        ? MAX_UINT256
+        : parseUnits(approveAmountInput, approveDecimals!).toString();
+      nodesToSubmit = scopeApproveNodeAmounts(pendingWorkflow.nodes, rawAmount);
+    }
+
     setLoading(true);
     try {
       await wallet.createKeeperhubWorkflow({
@@ -191,7 +312,7 @@ const SmartAutomations = () => {
           0,
           6
         )}`,
-        nodes: pendingWorkflow.nodes,
+        nodes: nodesToSubmit,
         edges: pendingWorkflow.edges,
       });
       message.success('Automation created');
@@ -211,7 +332,18 @@ const SmartAutomations = () => {
     } finally {
       setLoading(false);
     }
-  }, [account?.address, pendingWorkflow, pendingType, wallet, load]);
+  }, [
+    account?.address,
+    pendingWorkflow,
+    pendingType,
+    wallet,
+    load,
+    stopLossForm,
+    unlimitedApproval,
+    approveDecimals,
+    approveAmountInput,
+    approveAmountError,
+  ]);
 
   const handleCancelConsent = useCallback(() => {
     setShowConsent(false);
@@ -242,27 +374,55 @@ const SmartAutomations = () => {
     <div className="p-20">
       <PageHeader>Smart Automations</PageHeader>
 
-      <Card size="small" className="mb-16" title="Aave V3 position">
-        {healthFactorData.loading && <p>Loading position…</p>}
-        {healthFactorData.error && (
-          <p className="text-red-forbidden text-13">
-            Couldn&apos;t load position: {healthFactorData.error}
-          </p>
-        )}
-        {!healthFactorData.loading && !healthFactorData.error && (
-          <div className="flex justify-between text-13">
-            <span>
-              Health Factor:{' '}
-              {healthFactorData.healthFactor === 0
-                ? '—'
-                : healthFactorData.healthFactor?.toFixed(2)}
-            </span>
-            <span>
-              Collateral: ${healthFactorData.totalCollateralUSD?.toFixed(2)}
-            </span>
-            <span>Debt: ${healthFactorData.totalDebtUSD?.toFixed(2)}</span>
+      <Card size="small" className="mb-16" title="Discovery — Ethereum mainnet">
+        <div className="flex flex-col gap-8 text-13">
+          <div className="flex justify-between">
+            <span>Aave V3</span>
+            {healthFactorData.loading && <span>Loading…</span>}
+            {healthFactorData.error && (
+              <span className="text-red-forbidden">Error</span>
+            )}
+            {!healthFactorData.loading && !healthFactorData.error && (
+              <span>
+                HF{' '}
+                {healthFactorData.healthFactor === 0
+                  ? '—'
+                  : healthFactorData.healthFactor?.toFixed(2)}{' '}
+                · Debt ${healthFactorData.totalDebtUSD?.toFixed(2)}
+              </span>
+            )}
           </div>
-        )}
+          <div className="flex justify-between">
+            <span>Spark</span>
+            {sparkData.loading && <span>Loading…</span>}
+            {sparkData.error && <span className="text-red-forbidden">Error</span>}
+            {!sparkData.loading && !sparkData.error && (
+              <span>
+                HF{' '}
+                {sparkData.healthFactor === 0
+                  ? '—'
+                  : sparkData.healthFactor?.toFixed(2)}{' '}
+                · Debt ${sparkData.totalDebtUSD?.toFixed(2)}
+              </span>
+            )}
+          </div>
+          <div className="flex justify-between">
+            <span>Lido</span>
+            {lidoData.loading && <span>Loading…</span>}
+            {lidoData.error && <span className="text-red-forbidden">Error</span>}
+            {!lidoData.loading && !lidoData.error && (
+              <span>{lidoData.stEthBalance?.toFixed(4)} stETH</span>
+            )}
+          </div>
+          <div className="flex justify-between">
+            <span>CoW Swap</span>
+            {cowData.loading && <span>Loading…</span>}
+            {cowData.error && <span className="text-red-forbidden">Error</span>}
+            {!cowData.loading && !cowData.error && (
+              <span>{cowData.openOrderCount ?? 0} open orders</span>
+            )}
+          </div>
+        </div>
       </Card>
 
       <div className="flex flex-col gap-8">
@@ -362,6 +522,11 @@ const SmartAutomations = () => {
           onConfirm={handleConfirmCreate}
           onCancel={handleCancelConsent}
           loading={loading}
+          amount={approveAmountInput}
+          onAmountChange={setApproveAmountInput}
+          unlimited={unlimitedApproval}
+          onUnlimitedChange={setUnlimitedApproval}
+          amountError={approveAmountError}
         />
       )}
     </div>

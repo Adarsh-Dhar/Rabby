@@ -7526,6 +7526,89 @@ export class WalletController extends BaseController {
     };
   };
 
+  // Reads ERC20 decimals() on the given chain. Used by the Smart Automations
+  // consent modal to convert a human-entered approval amount (e.g. "500")
+  // into the raw base-unit string a workflow's erc20/approve node needs,
+  // and by the Discovery view to read balances for tokens like stETH.
+  getErc20DecimalsAndBalance = async ({
+    address,
+    tokenAddress,
+    chainId,
+  }: {
+    address: string;
+    tokenAddress: string;
+    chainId: number;
+  }) => {
+    const chain = findChain({ id: chainId });
+    if (!chain) {
+      throw new Error('wrong chain');
+    }
+    const decimalsAbi = [
+      {
+        name: 'decimals',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [],
+        outputs: [{ name: '', type: 'uint8' }],
+      },
+    ] as const;
+    const balanceAbi = [
+      {
+        name: 'balanceOf',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'account', type: 'address' }],
+        outputs: [{ name: '', type: 'uint256' }],
+      },
+    ] as const;
+
+    const [decimalsRes, balanceRes] = await Promise.all([
+      this.requestETHRpc(
+        {
+          method: 'eth_call',
+          params: [
+            {
+              data: encodeFunctionData({ abi: decimalsAbi, functionName: 'decimals' }),
+              to: tokenAddress,
+            },
+            'latest',
+          ],
+        },
+        chain.serverId
+      ),
+      this.requestETHRpc(
+        {
+          method: 'eth_call',
+          params: [
+            {
+              data: encodeFunctionData({
+                abi: balanceAbi,
+                functionName: 'balanceOf',
+                args: [address as `0x${string}`],
+              }),
+              to: tokenAddress,
+            },
+            'latest',
+          ],
+        },
+        chain.serverId
+      ),
+    ]);
+
+    const decimals = decodeFunctionResult({
+      abi: decimalsAbi,
+      functionName: 'decimals',
+      data: decimalsRes,
+    });
+    const balance = decodeFunctionResult({
+      abi: balanceAbi,
+      functionName: 'balanceOf',
+      data: balanceRes,
+    });
+
+    return { decimals, balance: balance.toString() };
+  };
+
   getSeaportCounter = async ({
     chainId,
     address,

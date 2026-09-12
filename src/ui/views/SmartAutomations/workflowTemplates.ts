@@ -5,10 +5,10 @@ import type {
 } from 'background/service/keeperhubMCP';
 
 // Ethereum mainnet contract addresses shared by the fallback workflow builders below.
-const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
+export const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
 const AAVE_V3_POOL_ADDRESS = '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2';
 const UNISWAP_V3_ROUTER_ADDRESS = '0xE592427A0AEce92De3Edee1F18E0157C05861564';
-const MAX_UINT256 =
+export const MAX_UINT256 =
   '115792089237316195423570985008687907853269984665640564039457584007913129639935';
 
 function buildErc20ApproveNode(params: {
@@ -18,6 +18,10 @@ function buildErc20ApproveNode(params: {
   token: string;
   spender: string;
   position: { x: number; y: number };
+  // Raw base-unit amount to approve. Defaults to MAX_UINT256 (unlimited) only
+  // when the caller doesn't pass one — callers should always pass an explicit
+  // scoped amount when the UI collected one from the user.
+  amount?: string;
 }): MCPWorkflowNode {
   return {
     id: params.id,
@@ -31,7 +35,7 @@ function buildErc20ApproveNode(params: {
         network: '1',
         token: params.token,
         spender: params.spender,
-        amount: MAX_UINT256,
+        amount: params.amount ?? MAX_UINT256,
         _protocolMeta: JSON.stringify({
           protocolSlug: 'erc20',
           contractKey: 'token',
@@ -46,6 +50,37 @@ function buildErc20ApproveNode(params: {
 }
 
 /**
+ * Rewrites the `amount` field on every erc20/approve node in a built workflow.
+ * Works whether the nodes came from the hand-built fallback above or from
+ * KeeperHub's AI-generation call (buildLiquidationShieldWorkflow /
+ * buildStopLossWorkflow can't pass approveAmount through to the AI path,
+ * since we don't control the shape of what the AI returns) — this runs on
+ * the final node list either way, right before submission, so the scoped
+ * amount the user set in the consent modal always applies.
+ */
+export function scopeApproveNodeAmounts(
+  nodes: MCPWorkflowNode[],
+  rawAmount: string
+): MCPWorkflowNode[] {
+  return nodes.map((node) => {
+    const config = (node.data as any)?.config;
+    if (config?.actionType === 'erc20/approve') {
+      return {
+        ...node,
+        data: {
+          ...node.data,
+          config: {
+            ...config,
+            amount: rawAmount,
+          },
+        },
+      };
+    }
+    return node;
+  });
+}
+
+/**
  * Build a liquidation shield workflow using KeeperHub's AI generation
  * This leverages the MCP service to generate proper workflow nodes and edges
  * instead of hand-authoring JSON structures that may not match server-side schemas.
@@ -53,6 +88,10 @@ function buildErc20ApproveNode(params: {
 export async function buildLiquidationShieldWorkflow(params: {
   address: string;
   healthFactorThreshold: number;
+  // Raw base-unit USDC amount the fallback workflow's approve node should be
+  // scoped to. Omit to fall back to MAX_UINT256 (unlimited) — the UI should
+  // always try to pass this so the user isn't silently defaulted to unlimited.
+  approveAmount?: string;
 }): Promise<{ nodes: MCPWorkflowNode[]; edges: MCPWorkflowEdge[] }> {
   try {
     const prompt = `Monitor Aave V3 health factor for address ${params.address} on Ethereum mainnet.
@@ -167,6 +206,7 @@ export async function buildLiquidationShieldWorkflow(params: {
           token: USDC_ADDRESS,
           spender: AAVE_V3_POOL_ADDRESS,
           position: { x: 600, y: 100 },
+          amount: params.approveAmount,
         }),
         {
           id: `action-${timestamp}`,
@@ -387,6 +427,9 @@ export async function buildStopLossWorkflow(params: {
   tokenAddress: string;
   thresholdPrice: number;
   targetToken: string;
+  // Raw base-unit amount (in tokenAddress's own decimals) the fallback
+  // workflow's approve node should be scoped to. Omit for MAX_UINT256.
+  approveAmount?: string;
 }): Promise<{ nodes: MCPWorkflowNode[]; edges: MCPWorkflowEdge[] }> {
   try {
     const prompt = `Create a stop-loss workflow for address ${params.address}.
@@ -500,6 +543,7 @@ export async function buildStopLossWorkflow(params: {
           token: params.tokenAddress,
           spender: UNISWAP_V3_ROUTER_ADDRESS,
           position: { x: 600, y: 100 },
+          amount: params.approveAmount,
         }),
         {
           id: `action-${timestamp}`,
