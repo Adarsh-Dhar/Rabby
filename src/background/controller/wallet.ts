@@ -7007,20 +7007,8 @@ export class WalletController extends BaseController {
       throw new Error('KeeperHub API key is not configured');
     }
 
-    // KeeperHub's API rejects requests originating from browser extensions
-    // (chrome-extension:// origin). Fail fast with a clear message rather than
-    // letting the request through and getting a cryptic 403 "Invalid origin".
-    if (
-      typeof location !== 'undefined' &&
-      location.protocol === 'chrome-extension:'
-    ) {
-      throw new Error(
-        'KEEPERHUB_EXTENSION_ORIGIN: KeeperHub workflows cannot be created directly from the extension. Use the KeeperHub web app at app.keeperhub.com to manage workflows.'
-      );
-    }
-
     try {
-      const res = await fetch('https://app.keeperhub.com/api/workflows', {
+      const res = await fetch('https://app.keeperhub.com/api/workflows/create', {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -7037,13 +7025,6 @@ export class WalletController extends BaseController {
       if (!res.ok) {
         const errorText = await res.text();
         console.error('KeeperHub API error:', res.status, errorText);
-
-        // Origin blocked by KeeperHub CORS policy
-        if (res.status === 403 && errorText.includes('Invalid origin')) {
-          throw new Error(
-            'KEEPERHUB_EXTENSION_ORIGIN: KeeperHub API does not allow requests from browser extensions. Use the KeeperHub web app at app.keeperhub.com to manage workflows.'
-          );
-        }
 
         throw new Error(
           `KeeperHub workflow creation failed: ${res.status} ${res.statusText}. ${errorText}`

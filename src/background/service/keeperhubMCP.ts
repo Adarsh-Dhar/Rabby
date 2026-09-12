@@ -105,17 +105,6 @@ class KeeperhubMCPService {
       throw new Error('Workflow generation prompt is required');
     }
 
-    // KeeperHub's API rejects requests from browser extensions (chrome-extension://
-    // origin). Fail fast rather than spamming the network with doomed requests.
-    if (
-      typeof location !== 'undefined' &&
-      location.protocol === 'chrome-extension:'
-    ) {
-      throw new Error(
-        'KEEPERHUB_EXTENSION_ORIGIN: KeeperHub AI generation cannot be called directly from the extension. Use the KeeperHub web app at app.keeperhub.com to manage workflows.'
-      );
-    }
-
     try {
       // Single canonical endpoint for AI workflow generation
       const endpoint = `${this.baseUrl}/workflows/ai-generate`;
@@ -132,12 +121,6 @@ class KeeperhubMCPService {
 
       if (!response.ok) {
         const errorText = await response.text();
-
-        if (response.status === 403 && errorText.includes('Invalid origin')) {
-          throw new Error(
-            'KEEPERHUB_EXTENSION_ORIGIN: KeeperHub API does not allow requests from browser extensions.'
-          );
-        }
 
         throw new Error(
           `Workflow generation failed: ${response.status} - ${errorText}`
@@ -160,8 +143,7 @@ class KeeperhubMCPService {
       if (error instanceof Error) {
         if (
           error.message.includes('API key') ||
-          error.message.includes('prompt') ||
-          error.message.includes('KEEPERHUB_EXTENSION_ORIGIN')
+          error.message.includes('prompt')
         ) {
           throw error;
         }
