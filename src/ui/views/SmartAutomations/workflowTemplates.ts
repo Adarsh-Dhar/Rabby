@@ -4,6 +4,47 @@ import type {
   MCPWorkflowEdge,
 } from 'background/service/keeperhubMCP';
 
+// Ethereum mainnet contract addresses shared by the fallback workflow builders below.
+const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
+const AAVE_V3_POOL_ADDRESS = '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2';
+const UNISWAP_V3_ROUTER_ADDRESS = '0xE592427A0AEce92De3Edee1F18E0157C05861564';
+const MAX_UINT256 =
+  '115792089237316195423570985008687907853269984665640564039457584007913129639935';
+
+function buildErc20ApproveNode(params: {
+  id: string;
+  label: string;
+  description: string;
+  token: string;
+  spender: string;
+  position: { x: number; y: number };
+}): MCPWorkflowNode {
+  return {
+    id: params.id,
+    type: 'action',
+    data: {
+      label: params.label,
+      description: params.description,
+      type: 'action',
+      config: {
+        actionType: 'erc20/approve',
+        network: '1',
+        token: params.token,
+        spender: params.spender,
+        amount: MAX_UINT256,
+        _protocolMeta: JSON.stringify({
+          protocolSlug: 'erc20',
+          contractKey: 'token',
+          functionName: 'approve',
+          actionType: 'write',
+        }),
+      },
+      status: 'idle',
+    },
+    position: params.position,
+  } as MCPWorkflowNode;
+}
+
 /**
  * Build a liquidation shield workflow using KeeperHub's AI generation
  * This leverages the MCP service to generate proper workflow nodes and edges
@@ -17,7 +58,8 @@ export async function buildLiquidationShieldWorkflow(params: {
     const prompt = `Monitor Aave V3 health factor for address ${params.address} on Ethereum mainnet.
     When the health factor drops below ${params.healthFactorThreshold}, automatically trigger a debt repayment
     transaction to protect the position from liquidation. The workflow should check the health factor periodically
-    and execute the repayment only when the threshold is breached.`;
+    and execute the repayment only when the threshold is breached. Include an approve step for the spending
+    contract (the Aave V3 Pool) before the repay write action, since the repay call will fail without it.`;
 
     console.log('Generating liquidation shield workflow with params:', params);
 
@@ -118,6 +160,14 @@ export async function buildLiquidationShieldWorkflow(params: {
           },
           position: { x: 500, y: 100 },
         },
+        buildErc20ApproveNode({
+          id: `approve-${timestamp}`,
+          label: 'Approve USDC',
+          description: 'Approve Aave V3 Pool to spend USDC for repayment',
+          token: USDC_ADDRESS,
+          spender: AAVE_V3_POOL_ADDRESS,
+          position: { x: 600, y: 100 },
+        }),
         {
           id: `action-${timestamp}`,
           type: 'action',
@@ -128,8 +178,8 @@ export async function buildLiquidationShieldWorkflow(params: {
             config: {
               actionType: 'aave-v3/repay',
               network: '1',
-              asset: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
-              amount: '115792089237316195423570985008687907853269984665640564039457584007913129639935', // max uint256
+              asset: USDC_ADDRESS,
+              amount: MAX_UINT256,
               interestRateMode: '1', // Stable rate
               onBehalfOf: params.address,
               _protocolMeta: JSON.stringify({
@@ -141,7 +191,7 @@ export async function buildLiquidationShieldWorkflow(params: {
             },
             status: 'idle',
           },
-          position: { x: 700, y: 100 },
+          position: { x: 800, y: 100 },
         },
       ],
       edges: [
@@ -158,8 +208,13 @@ export async function buildLiquidationShieldWorkflow(params: {
         {
           id: `edge-3-${timestamp}`,
           source: `condition-${timestamp}`,
-          target: `action-${timestamp}`,
+          target: `approve-${timestamp}`,
           sourceHandle: 'true',
+        },
+        {
+          id: `edge-4-${timestamp}`,
+          source: `approve-${timestamp}`,
+          target: `action-${timestamp}`,
         },
       ],
     };
@@ -337,7 +392,9 @@ export async function buildStopLossWorkflow(params: {
     const prompt = `Create a stop-loss workflow for address ${params.address}.
     Monitor the price of token at ${params.tokenAddress}. When the price drops below ${params.thresholdPrice},
     automatically sell the position for ${params.targetToken} to limit losses.
-    The workflow should use reliable price oracles and execute trades efficiently when the threshold is breached.`;
+    The workflow should use reliable price oracles and execute trades efficiently when the threshold is breached.
+    Include an approve step for the spending contract (the Uniswap V3 Router) before the swap write action,
+    since the swap call will fail without it.`;
 
     console.log('Generating stop-loss workflow with params:', params);
 
@@ -436,6 +493,14 @@ export async function buildStopLossWorkflow(params: {
           },
           position: { x: 500, y: 100 },
         },
+        buildErc20ApproveNode({
+          id: `approve-${timestamp}`,
+          label: 'Approve token for swap',
+          description: 'Approve Uniswap V3 Router to spend the watched token',
+          token: params.tokenAddress,
+          spender: UNISWAP_V3_ROUTER_ADDRESS,
+          position: { x: 600, y: 100 },
+        }),
         {
           id: `action-${timestamp}`,
           type: 'action',
@@ -450,7 +515,7 @@ export async function buildStopLossWorkflow(params: {
               tokenOut: params.targetToken,
               fee: '3000',
               recipient: params.address,
-              amountIn: '115792089237316195423570985008687907853269984665640564039457584007913129639935', // max uint256
+              amountIn: MAX_UINT256,
               amountOutMinimum: '0',
               _protocolMeta: JSON.stringify({
                 protocolSlug: 'uniswap-v3',
@@ -461,7 +526,7 @@ export async function buildStopLossWorkflow(params: {
             },
             status: 'idle',
           },
-          position: { x: 700, y: 100 },
+          position: { x: 800, y: 100 },
         },
       ],
       edges: [
@@ -478,8 +543,13 @@ export async function buildStopLossWorkflow(params: {
         {
           id: `edge-3-${timestamp}`,
           source: `condition-${timestamp}`,
-          target: `action-${timestamp}`,
+          target: `approve-${timestamp}`,
           sourceHandle: 'true',
+        },
+        {
+          id: `edge-4-${timestamp}`,
+          source: `approve-${timestamp}`,
+          target: `action-${timestamp}`,
         },
       ],
     };

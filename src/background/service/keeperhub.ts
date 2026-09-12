@@ -27,8 +27,9 @@ class KeeperhubService {
   private apiKey: string;
 
   constructor() {
-    // Set default API key immediately, will be updated from persisted store in init()
-    this.apiKey = 'kh_LsNuD78Ww0_nWjToSc33b9RZ_LdMA5QF';
+    // No default key. Until the user configures one in Settings, this stays
+    // empty and getKeeperhubApiKeyStatus() will correctly report "not connected".
+    this.apiKey = '';
   }
 
   init = async () => {
@@ -36,15 +37,10 @@ class KeeperhubService {
       name: 'keeperhub',
       template: {
         workflowsByAddress: {},
-        apiKey: 'kh_LsNuD78Ww0_nWjToSc33b9RZ_LdMA5QF',
+        apiKey: '',
       },
     });
-    // Update from store if available, otherwise keep the default
-    if (this.store.apiKey) {
-      this.apiKey = this.store.apiKey;
-    } else {
-      this.store.apiKey = this.apiKey;
-    }
+    this.apiKey = this.store.apiKey || '';
   };
 
   setApiKey = (key: string) => {

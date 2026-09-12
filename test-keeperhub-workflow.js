@@ -125,10 +125,11 @@ async function buildLiquidationShieldWorkflow(params) {
 // Simulate the wallet.createKeeperhubWorkflow function
 async function createKeeperhubWorkflow(params) {
   // Use the default API key from the keeperhub service, or environment variable if set
-  const apiKey = process.env.KEEPERHUB_API_KEY || 'kh_LsNuD78Ww0_nWjToSc33b9RZ_LdMA5QF';
-  
+  const apiKey = process.env.KEEPERHUB_API_KEY;
   if (!apiKey) {
-    throw new Error('KEEPERHUB_API_KEY environment variable is not set');
+    throw new Error(
+      'Set KEEPERHUB_API_KEY in your environment before running this script (no default key is provided).'
+    );
   }
 
   console.log('Creating workflow with params:', {

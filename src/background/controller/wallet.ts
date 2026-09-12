@@ -6990,6 +6990,15 @@ export class WalletController extends BaseController {
     return keeperhubService.getWorkflows(address);
   };
 
+  getKeeperhubWorkflowExecutions = async (
+    address: string,
+    workflowId: string
+  ) => {
+    // Placeholder for future implementation
+    // This would call KeeperHub API to fetch execution history
+    return [];
+  };
+
   // Calls POST https://app.keeperhub.com/api/workflows, then persists the
   // returned workflow id against the current address. Actual monitoring and
   // execution happens on KeeperHub's infrastructure, not in this extension -
@@ -7440,6 +7449,80 @@ export class WalletController extends BaseController {
       chainId,
       data: encodedData,
       to: contractAddress,
+    };
+  };
+
+  // Reads Aave V3 Pool.getUserAccountData(address) on the given chain via the
+  // existing eth_call plumbing. Used by the Smart Automations "discovery"
+  // view to show current Health Factor / collateral / debt before the user
+  // configures a liquidation-shield automation.
+  getAaveUserAccountData = async ({
+    address,
+    chainId,
+    poolAddress,
+  }: {
+    address: string;
+    chainId: number;
+    poolAddress: string;
+  }) => {
+    const chain = findChain({ id: chainId });
+    if (!chain) {
+      throw new Error('wrong chain');
+    }
+    const abi = [
+      {
+        name: 'getUserAccountData',
+        type: 'function',
+        stateMutability: 'view',
+        inputs: [{ name: 'user', type: 'address' }],
+        outputs: [
+          { name: 'totalCollateralBase', type: 'uint256' },
+          { name: 'totalDebtBase', type: 'uint256' },
+          { name: 'availableBorrowsBase', type: 'uint256' },
+          { name: 'currentLiquidationThreshold', type: 'uint256' },
+          { name: 'ltv', type: 'uint256' },
+          { name: 'healthFactor', type: 'uint256' },
+        ],
+      },
+    ] as const;
+
+    const data = encodeFunctionData({
+      abi,
+      functionName: 'getUserAccountData',
+      args: [address as `0x${string}`],
+    });
+
+    const res = await this.requestETHRpc(
+      {
+        method: 'eth_call',
+        params: [
+          {
+            data,
+            to: poolAddress,
+          },
+          'latest',
+        ],
+      },
+      chain.serverId
+    );
+
+    const [
+      totalCollateralBase,
+      totalDebtBase,
+      ,
+      ,
+      ,
+      healthFactor,
+    ] = decodeFunctionResult({
+      abi,
+      functionName: 'getUserAccountData',
+      data: res,
+    });
+
+    return {
+      totalCollateralBase,
+      totalDebtBase,
+      healthFactor,
     };
   };
 
