@@ -28,7 +28,8 @@
     "check": "npm run lint && npm run typecheck",
     "test": "jest",
     "pub": "node build/release.js",
-    "postinstall": "patch-package"
+    "postinstall": "patch-package",
+    "realtime": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/realtime/index.ts"
   },
   "dependencies": {
     "@bitboxswiss/bitbox-api": "0.1.1",
