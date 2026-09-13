@@ -18,6 +18,7 @@ import {
 } from '../components/WorkflowConsentModal';
 import { ExecutionHistory } from '../components/ExecutionHistory';
 import { useAaveHealthFactor } from '../hooks/useAaveHealthFactor';
+import { applyRoleDelegation } from '../delegation/zodiacRoles';
 import {
   useAaveForkPosition,
   useLidoPosition,
@@ -300,6 +301,15 @@ const SmartAutomations = () => {
         ? MAX_UINT256
         : parseUnits(approveAmountInput, approveDecimals!).toString();
       nodesToSubmit = scopeApproveNodeAmounts(pendingWorkflow.nodes, rawAmount);
+    }
+
+    // If the user has configured a Safe + Zodiac Roles Modifier, route
+    // execution through the role instead of executing directly — see
+    // DelegationSettings.tsx / delegation/zodiacRoles.ts. This runs after
+    // scopeApproveNodeAmounts so the role wraps the already-capped amount.
+    const roleDelegation = await wallet.getRoleDelegation(account.address);
+    if (roleDelegation) {
+      nodesToSubmit = applyRoleDelegation(nodesToSubmit as any, roleDelegation) as any;
     }
 
     setLoading(true);

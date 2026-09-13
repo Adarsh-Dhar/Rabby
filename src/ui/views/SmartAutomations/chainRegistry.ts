@@ -1,0 +1,86 @@
+/**
+ * Multi-chain contract registry for Smart Automations.
+ *
+ * WHY THIS EXISTS: workflowTemplates.ts, usePositions.ts, and home.tsx were
+ * all hardcoding `network: '1'` / `chainId: 1`. That's not a real multi-chain
+ * gap you can patch by find-and-replace — every address below moves real
+ * funds (approve/repay/swap targets), so a wrong entry here is a fund-loss
+ * bug, not a cosmetic one. This file is the ONE place those addresses live,
+ * so extending to a new chain means adding a verified row here, not hunting
+ * through workflow builders.
+ *
+ * RULE FOR ADDING A CHAIN: only add an entry once you (a human) have checked
+ * the address against the protocol's own docs or a block explorer's
+ * "verified contract" page, ideally two independent sources. Do not add an
+ * address because it "looks right" or was pattern-matched from mainnet.
+ * `verified: false` entries are refused at runtime (see assertChainVerified)
+ * so a half-filled-in row can't silently ship.
+ */
+
+export type SupportedChainKey = 'ethereum';
+
+export interface ChainContracts {
+  chainId: number;
+  /** Numeric chainId as the string form KeeperHub's `network` field expects. */
+  network: string;
+  label: string;
+  aaveV3Pool?: string;
+  sparkPool?: string;
+  lidoStEth?: string;
+  usdc?: string;
+  uniswapV3Router?: string;
+  /** Set once a human has verified every address above against a primary source. */
+  verified: boolean;
+  verifiedAgainst?: string;
+}
+
+export const CHAIN_REGISTRY: Record<SupportedChainKey, ChainContracts> = {
+  ethereum: {
+    chainId: 1,
+    network: '1',
+    label: 'Ethereum Mainnet',
+    aaveV3Pool: '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2',
+    sparkPool: '0xC13e21B648A5Ee794902342038FF3aDAB66BE987',
+    lidoStEth: '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84',
+    usdc: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
+    uniswapV3Router: '0xE592427A0AEce92De3Edee1F18E0157C05861564',
+    verified: true,
+    verifiedAgainst:
+      'Etherscan verified-source pages, cross-checked against Aave/Spark/Lido official docs',
+  },
+  // Add 'base', 'arbitrum', etc. here once addresses are verified. Example
+  // shape (commented out on purpose — do not uncomment with guessed values):
+  //
+  // base: {
+  //   chainId: 8453,
+  //   network: '8453',
+  //   label: 'Base',
+  //   aaveV3Pool: '0x...',       // <- verify against Aave's official deployment docs
+  //   usdc: '0x...',             // <- verify against Circle's official contract list
+  //   verified: false,
+  //   verifiedAgainst: undefined,
+  // },
+};
+
+export class UnverifiedChainError extends Error {
+  constructor(chain: string) {
+    super(
+      `Chain "${chain}" is not marked verified in chainRegistry.ts. Refusing to build` +
+        ` a workflow against it — add real, verified contract addresses first.`
+    );
+    this.name = 'UnverifiedChainError';
+  }
+}
+
+/** Every workflow builder should call this before reading chain contracts. */
+export function getChainContracts(chain: SupportedChainKey): ChainContracts {
+  const entry = CHAIN_REGISTRY[chain];
+  if (!entry || !entry.verified) {
+    throw new UnverifiedChainError(chain);
+  }
+  return entry;
+}
+
+export function listVerifiedChains(): ChainContracts[] {
+  return Object.values(CHAIN_REGISTRY).filter((c) => c.verified);
+}

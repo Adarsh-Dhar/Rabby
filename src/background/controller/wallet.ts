@@ -45,6 +45,7 @@ import {
   OfflineChainsService,
   perpsService,
   keeperhubService,
+  roleDelegationService,
   keeperhubMCPService,
   miscService,
   feedbackService,
@@ -6985,6 +6986,18 @@ export class WalletController extends BaseController {
   };
   getKeeperhubApiKeyStatus = () => Boolean(keeperhubService.getApiKey());
   clearKeeperhubApiKey = () => keeperhubService.clearApiKey();
+
+  // Optional Safe + Zodiac Roles Modifier delegation config. See
+  // src/background/service/roleDelegation.ts and
+  // src/ui/views/SmartAutomations/delegation/zodiacRoles.ts. Rabby only
+  // stores what the user pastes in here — it never derives or guesses
+  // these addresses.
+  getRoleDelegation = (address: string) => roleDelegationService.get(address);
+  setRoleDelegation = (
+    address: string,
+    config: { safeAddress: string; rolesModifierAddress: string; roleKey: string; chainId: number }
+  ) => roleDelegationService.set(address, config);
+  clearRoleDelegation = (address: string) => roleDelegationService.clear(address);
 
   getKeeperhubWorkflows = async (address: string) => {
     return keeperhubService.getWorkflows(address);

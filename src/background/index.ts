@@ -69,6 +69,7 @@ import {
   OfflineChainsService,
   perpsService,
   keeperhubService,
+  roleDelegationService,
   transactionsService,
   feedbackService,
 } from './service';
@@ -190,6 +191,7 @@ async function restoreAppState() {
   await syncChainService.init();
   await perpsService.init();
   await keeperhubService.init();
+  await roleDelegationService.init();
   await transactionsService.init();
   await feedbackService.init();
 
