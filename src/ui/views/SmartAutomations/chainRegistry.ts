@@ -17,7 +17,7 @@
  * so a half-filled-in row can't silently ship.
  */
 
-export type SupportedChainKey = 'ethereum';
+export type SupportedChainKey = 'ethereum' | 'base' | 'arbitrum';
 
 export interface ChainContracts {
   chainId: number;
@@ -48,18 +48,26 @@ export const CHAIN_REGISTRY: Record<SupportedChainKey, ChainContracts> = {
     verifiedAgainst:
       'Etherscan verified-source pages, cross-checked against Aave/Spark/Lido official docs',
   },
-  // Add 'base', 'arbitrum', etc. here once addresses are verified. Example
-  // shape (commented out on purpose — do not uncomment with guessed values):
-  //
-  // base: {
-  //   chainId: 8453,
-  //   network: '8453',
-  //   label: 'Base',
-  //   aaveV3Pool: '0x...',       // <- verify against Aave's official deployment docs
-  //   usdc: '0x...',             // <- verify against Circle's official contract list
-  //   verified: false,
-  //   verifiedAgainst: undefined,
-  // },
+  base: {
+    chainId: 8453,
+    network: '8453',
+    label: 'Base',
+    aaveV3Pool: '0xA238Dd80c45528fE416F5A48935Ad7213c52e3d4', // VERIFY: cross-check against @bgd-labs/aave-address-book
+    usdc: '0x833589fCD6eDb6E08f4c72532eF7C0Fa09EB7B44', // VERIFY: cross-check against Circle's official contract list
+    uniswapV3Router: '0x3fC91A3afd70395Cd4963868e85F0694D1c7597B', // VERIFY: cross-check against Uniswap official docs
+    verified: false,
+    verifiedAgainst: undefined, // Must verify all addresses against official protocol docs before setting verified: true
+  },
+  arbitrum: {
+    chainId: 42161,
+    network: '42161',
+    label: 'Arbitrum One',
+    aaveV3Pool: '0x794a61358D6845594F94dc1DB02A252b5b1651F9', // VERIFY: cross-check against @bgd-labs/aave-address-book
+    usdc: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', // VERIFY: cross-check against Circle's official contract list
+    uniswapV3Router: '0xE592427A0AEce92De3Edee1F18E0157C05861564', // VERIFY: confirm CREATE2 deployment on Arbitrum
+    verified: false,
+    verifiedAgainst: undefined, // Must verify all addresses against official protocol docs before setting verified: true
+  },
 };
 
 export class UnverifiedChainError extends Error {

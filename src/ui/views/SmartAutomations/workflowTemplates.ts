@@ -263,7 +263,7 @@ export async function buildLiquidationShieldWorkflow(params: {
 
 /**
  * Build a yield harvester workflow using KeeperHub's AI generation
- * Automatically claims and compounds rewards from DeFi protocols
+ * Automatically claims rewards from DeFi protocols to your wallet
  */
 export async function buildYieldHarvesterWorkflow(params: {
   address: string;
@@ -273,9 +273,8 @@ export async function buildYieldHarvesterWorkflow(params: {
     const protocolList = params.protocols.join(', ');
     const prompt = `Create a yield harvesting workflow for address ${params.address}.
     Monitor reward accumulation from the following DeFi protocols: ${protocolList}.
-    When rewards exceed a gas-efficient threshold, automatically claim and compound them
-    back into the protocol to maximize yield. The workflow should balance gas costs against
-    reward amounts and only execute when profitable.`;
+    When rewards exceed a gas-efficient threshold, automatically claim them to your wallet.
+    The workflow should balance gas costs against reward amounts and only execute when profitable.`;
 
     console.log('Generating yield harvester workflow with params:', params);
 
@@ -377,7 +376,7 @@ export async function buildYieldHarvesterWorkflow(params: {
           type: 'action',
           data: {
             label: 'Claim Rewards',
-            description: 'Claim and compound rewards',
+            description: 'Claim rewards to your wallet',
             type: 'action',
             config: {
               actionType: 'aave-v3/claim-rewards',
@@ -412,6 +411,115 @@ export async function buildYieldHarvesterWorkflow(params: {
           source: `condition-${timestamp}`,
           target: `action-${timestamp}`,
           sourceHandle: 'true',
+        },
+      ],
+    };
+  }
+}
+
+/**
+ * Build a TWAP workflow using CoW Protocol's ComposableCoW
+ * This creates a time-weighted average price order that executes over a specified duration
+ */
+export async function buildTwapWorkflow(params: {
+  address: string;
+  sellToken: string;
+  buyToken: string;
+  totalSellAmount: string;
+  totalBuyAmountMin: string;
+  numParts: number;
+  partDurationSeconds: number;
+}): Promise<{ nodes: MCPWorkflowNode[]; edges: MCPWorkflowEdge[] }> {
+  try {
+    const prompt = `Create a TWAP (Time-Weighted Average Price) workflow for address ${params.address}.
+    Sell ${params.totalSellAmount} of ${params.sellToken} for ${params.buyToken} over ${params.numParts} parts,
+    with each part executing every ${params.partDurationSeconds} seconds. The total minimum buy amount is ${params.totalBuyAmountMin}.
+    This is a one-time order creation action, not a recurring automation — the order will be placed on CoW Protocol's orderbook
+    and filled by their solver network over time without further signatures.`;
+
+    console.log('Generating TWAP workflow with params:', params);
+
+    const response = await keeperhubMCPService.generateWorkflow({
+      prompt,
+      context: {
+        address: params.address,
+        sellToken: params.sellToken,
+        buyToken: params.buyToken,
+        totalSellAmount: params.totalSellAmount,
+        totalBuyAmountMin: params.totalBuyAmountMin,
+        numParts: params.numParts,
+        partDurationSeconds: params.partDurationSeconds,
+        protocol: 'cow-protocol',
+        action: 'twap-order',
+      },
+    });
+
+    console.log('Workflow generation successful:', response);
+
+    return {
+      nodes: response.nodes,
+      edges: response.edges,
+    };
+  } catch (error) {
+    console.error('Failed to generate TWAP workflow:', error);
+    if (error instanceof Error) {
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+      });
+    }
+
+    // Fallback: create a basic TWAP structure
+    const timestamp = Date.now();
+    return {
+      nodes: [
+        {
+          id: `trigger-${timestamp}`,
+          type: 'trigger',
+          data: {
+            label: 'Manual Trigger',
+            description: 'One-time TWAP order creation',
+            type: 'trigger',
+            config: {
+              triggerType: 'Manual',
+            },
+            status: 'idle',
+          },
+          position: { x: 100, y: 100 },
+        },
+        {
+          id: `action-${timestamp}`,
+          type: 'action',
+          data: {
+            label: 'Create TWAP Order',
+            description: `Sell ${params.sellToken.slice(0, 8)}… for ${params.buyToken.slice(0, 8)}… over ${params.numParts} parts`,
+            type: 'action',
+            config: {
+              actionType: 'cow-twap/create-order',
+              network: '1',
+              sellToken: params.sellToken,
+              buyToken: params.buyToken,
+              totalSellAmount: params.totalSellAmount,
+              totalBuyAmountMin: params.totalBuyAmountMin,
+              numParts: params.numParts,
+              partDurationSeconds: params.partDurationSeconds,
+              _protocolMeta: JSON.stringify({
+                protocolSlug: 'cow-protocol',
+                contractKey: 'composable-cow',
+                functionName: 'createTwapOrder',
+                actionType: 'write'
+              })
+            },
+            status: 'idle',
+          },
+          position: { x: 300, y: 100 },
+        },
+      ],
+      edges: [
+        {
+          id: `edge-1-${timestamp}`,
+          source: `trigger-${timestamp}`,
+          target: `action-${timestamp}`,
         },
       ],
     };

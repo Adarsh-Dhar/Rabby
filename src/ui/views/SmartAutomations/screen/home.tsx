@@ -3,15 +3,17 @@ import { parseUnits } from 'viem';
 import { PageHeader } from '@/ui/component';
 import { useWallet } from '@/ui/utils';
 import { useCurrentAccount } from '@/ui/hooks/backgroundState/useAccount';
-import { Button, Card, Input, InputNumber, message } from 'antd';
+import { Button, Card, Input, InputNumber, message, Select } from 'antd';
 import {
   buildLiquidationShieldWorkflow,
   buildYieldHarvesterWorkflow,
   buildStopLossWorkflow,
+  buildTwapWorkflow,
   scopeApproveNodeAmounts,
   USDC_ADDRESS,
   MAX_UINT256,
 } from '../workflowTemplates';
+import { listVerifiedChains, type ChainContracts } from '../chainRegistry';
 import {
   WorkflowConsentModal,
   WorkflowConsentSummary,
@@ -32,12 +34,21 @@ interface WorkflowRow {
   lastKnownStatus?: string;
 }
 
-type AutomationType = 'liquidation-shield' | 'yield-harvester' | 'stop-loss';
+type AutomationType = 'liquidation-shield' | 'yield-harvester' | 'stop-loss' | 'twap';
 
 interface StopLossParams {
   tokenAddress: string;
   thresholdPrice: number;
   targetToken: string;
+}
+
+interface TwapParams {
+  sellToken: string;
+  buyToken: string;
+  totalSellAmount: string;
+  totalBuyAmountMin: string;
+  numParts: number;
+  partDurationSeconds: number;
 }
 
 // Everything needed to render a card/button, build the workflow, and show
@@ -47,21 +58,22 @@ interface AutomationConfig {
   build: (
     address: string,
     stopLossParams?: StopLossParams,
+    twapParams?: TwapParams,
     approveAmount?: string
   ) => Promise<{ nodes: any[]; edges: any[] }>;
-  summary: (stopLossParams?: StopLossParams) => WorkflowConsentSummary;
-  // Stop-loss needs a small form filled in before we can build the workflow.
+  summary: (stopLossParams?: StopLossParams, twapParams?: TwapParams) => WorkflowConsentSummary;
+  // Stop-loss and TWAP need small forms filled in before we can build the workflow.
   needsForm?: boolean;
   // Token being approved for this automation's approve node, if any. Used to
   // drive the scoped-amount control in the consent modal — omit for
   // automations (like yield-harvester) that don't spend the user's tokens.
-  approveToken?: (stopLossParams?: StopLossParams) => string | undefined;
+  approveToken?: (stopLossParams?: StopLossParams, twapParams?: TwapParams) => string | undefined;
 }
 
 const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
   'liquidation-shield': {
     label: 'Liquidation Shield (HF < 1.15)',
-    build: (address, _stopLossParams, approveAmount) =>
+    build: (address, _stopLossParams, _twapParams, approveAmount) =>
       buildLiquidationShieldWorkflow({
         address,
         healthFactorThreshold: 1.15,
@@ -78,11 +90,11 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
     }),
   },
   'yield-harvester': {
-    label: 'Yield Harvester (Aave rewards)',
+    label: 'Yield Harvester (claim to wallet)',
     // No approveToken: this only calls claimRewards(to: yourAddress) — it
     // pays rewards out to you, it doesn't spend an allowance, so there's
-    // nothing to scope here. (It also doesn't currently re-supply/compound
-    // the claimed rewards despite the label — see workflowTemplates.ts.)
+    // nothing to scope here. (It doesn't re-supply the claimed rewards —
+    // it's a claim-to-wallet workflow, not compounding.)
     build: (address) =>
       buildYieldHarvesterWorkflow({ address, protocols: ['aave-v3'] }),
     summary: () => ({
@@ -97,7 +109,7 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
     label: 'Stop-Loss (Uniswap v3)',
     needsForm: true,
     approveToken: (stopLossParams) => stopLossParams?.tokenAddress,
-    build: (address, stopLossParams, approveAmount) => {
+    build: (address, stopLossParams, _twapParams, approveAmount) => {
       if (!stopLossParams) {
         throw new Error('Stop-loss requires token, threshold, and target token');
       }
@@ -122,6 +134,37 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
       tokenSymbol: 'the watched token',
     }),
   },
+  'twap': {
+    label: 'TWAP (CoW Protocol)',
+    needsForm: true,
+    approveToken: (stopLossParams, twapParams) => twapParams?.sellToken,
+    build: (address, _stopLossParams, twapParams) => {
+      if (!twapParams) {
+        throw new Error('TWAP requires sell token, buy token, amount, parts, and duration');
+      }
+      return buildTwapWorkflow({
+        address,
+        sellToken: twapParams.sellToken,
+        buyToken: twapParams.buyToken,
+        totalSellAmount: twapParams.totalSellAmount,
+        totalBuyAmountMin: twapParams.totalBuyAmountMin,
+        numParts: twapParams.numParts,
+        partDurationSeconds: twapParams.partDurationSeconds,
+      });
+    },
+    summary: (stopLossParams, twapParams) => ({
+      protocol: 'CoW Protocol',
+      action: 'Create TWAP order',
+      maxAmount: twapParams
+        ? `${twapParams.totalSellAmount} ${twapParams.sellToken.slice(0, 8)}…`
+        : 'Total sell amount',
+      triggerCondition: twapParams
+        ? `${twapParams.numParts} parts over ${twapParams.partDurationSeconds}s each`
+        : 'TWAP schedule',
+      chain: 'Ethereum',
+      tokenSymbol: twapParams?.sellToken?.slice(0, 8) || 'sell token',
+    }),
+  },
 };
 
 const SmartAutomations = () => {
@@ -133,6 +176,7 @@ const SmartAutomations = () => {
   const [expandedWorkflowId, setExpandedWorkflowId] = useState<string | null>(
     null
   );
+  const [selectedChain, setSelectedChain] = useState<ChainContracts | null>(null);
 
   // Consent modal state
   const [showConsent, setShowConsent] = useState(false);
@@ -162,6 +206,17 @@ const SmartAutomations = () => {
   });
   const [showStopLossForm, setShowStopLossForm] = useState(false);
 
+  // TWAP form state
+  const [twapForm, setTwapForm] = useState<TwapParams>({
+    sellToken: '',
+    buyToken: '',
+    totalSellAmount: '',
+    totalBuyAmountMin: '',
+    numParts: 10,
+    partDurationSeconds: 3600,
+  });
+  const [showTwapForm, setShowTwapForm] = useState(false);
+
   const healthFactorData = useAaveHealthFactor(account?.address);
   const sparkData = useAaveForkPosition(
     account?.address,
@@ -185,13 +240,21 @@ const SmartAutomations = () => {
     load();
   }, [load]);
 
+  // Initialize selected chain with the first verified chain
+  useEffect(() => {
+    const verifiedChains = listVerifiedChains();
+    if (verifiedChains.length > 0 && !selectedChain) {
+      setSelectedChain(verifiedChains[0]);
+    }
+  }, [selectedChain]);
+
   // Once a workflow is staged for consent, look up the decimals of whatever
   // token its approve node would spend, so the amount input in the modal can
   // work in human units instead of raw base units.
   useEffect(() => {
     if (!pendingType || !account?.address) return;
     const tokenAddress = AUTOMATIONS[pendingType].approveToken?.(
-      pendingType === 'stop-loss' ? stopLossForm : undefined
+      pendingType === 'stop-loss' ? stopLossForm : pendingType === 'twap' ? twapForm : undefined
     );
     if (!tokenAddress) {
       setApproveDecimals(null);
@@ -217,7 +280,7 @@ const SmartAutomations = () => {
     return () => {
       cancelled = true;
     };
-  }, [pendingType, account?.address, wallet, stopLossForm]);
+  }, [pendingType, account?.address, wallet, stopLossForm, twapForm]);
 
   useEffect(() => {
     if (!approveAmountInput || unlimitedApproval) {
@@ -233,12 +296,13 @@ const SmartAutomations = () => {
   }, [approveAmountInput, unlimitedApproval]);
 
   const handlePrepareAutomation = useCallback(
-    async (type: AutomationType, stopLossParams?: StopLossParams) => {
+    async (type: AutomationType, stopLossParams?: StopLossParams, twapParams?: TwapParams) => {
       if (!account?.address) return;
       try {
         const built = await AUTOMATIONS[type].build(
           account.address,
-          stopLossParams
+          stopLossParams,
+          twapParams
         );
         setPendingType(type);
         setPendingWorkflow(built);
@@ -255,7 +319,11 @@ const SmartAutomations = () => {
   const handleAutomationButtonClick = useCallback(
     (type: AutomationType) => {
       if (AUTOMATIONS[type].needsForm) {
-        setShowStopLossForm(true);
+        if (type === 'stop-loss') {
+          setShowStopLossForm(true);
+        } else if (type === 'twap') {
+          setShowTwapForm(true);
+        }
         return;
       }
       handlePrepareAutomation(type);
@@ -276,11 +344,27 @@ const SmartAutomations = () => {
     handlePrepareAutomation('stop-loss', stopLossForm);
   }, [stopLossForm, handlePrepareAutomation]);
 
+  const handleConfirmTwapForm = useCallback(() => {
+    if (
+      !twapForm.sellToken ||
+      !twapForm.buyToken ||
+      !twapForm.totalSellAmount ||
+      !twapForm.totalBuyAmountMin ||
+      !twapForm.numParts ||
+      !twapForm.partDurationSeconds
+    ) {
+      message.error('Fill in sell token, buy token, amounts, parts, and duration');
+      return;
+    }
+    setShowTwapForm(false);
+    handlePrepareAutomation('twap', undefined, twapForm);
+  }, [twapForm, handlePrepareAutomation]);
+
   const handleConfirmCreate = useCallback(async () => {
     if (!account?.address || !pendingWorkflow || !pendingType) return;
 
     const approveToken = AUTOMATIONS[pendingType].approveToken?.(
-      pendingType === 'stop-loss' ? stopLossForm : undefined
+      pendingType === 'stop-loss' ? stopLossForm : pendingType === 'twap' ? twapForm : undefined
     );
 
     let nodesToSubmit = pendingWorkflow.nodes;
@@ -316,7 +400,7 @@ const SmartAutomations = () => {
     try {
       await wallet.createKeeperhubWorkflow({
         address: account.address,
-        chainId: 1,
+        chainId: selectedChain?.chainId ?? 1,
         type: pendingType,
         name: `${AUTOMATIONS[pendingType].label} - ${account.address.slice(
           0,
@@ -349,6 +433,7 @@ const SmartAutomations = () => {
     wallet,
     load,
     stopLossForm,
+    twapForm,
     unlimitedApproval,
     approveDecimals,
     approveAmountInput,
@@ -359,6 +444,10 @@ const SmartAutomations = () => {
     setShowConsent(false);
     setPendingType(null);
     setPendingWorkflow(null);
+  }, []);
+
+  const handleCancelTwapForm = useCallback(() => {
+    setShowTwapForm(false);
   }, []);
 
   const isHealthFactorSafe = useMemo(() => {
@@ -384,46 +473,73 @@ const SmartAutomations = () => {
     <div className="p-20">
       <PageHeader>Smart Automations</PageHeader>
 
-      <Card size="small" className="mb-16" title="Discovery — Ethereum mainnet">
+      <Card size="small" className="mb-16" title={`Discovery — ${selectedChain?.label || 'Select a chain'}`}>
         <div className="flex flex-col gap-8 text-13">
-          <div className="flex justify-between">
-            <span>Aave V3</span>
-            {healthFactorData.loading && <span>Loading…</span>}
-            {healthFactorData.error && (
-              <span className="text-red-forbidden">Error</span>
-            )}
-            {!healthFactorData.loading && !healthFactorData.error && (
-              <span>
-                HF{' '}
-                {healthFactorData.healthFactor === 0
-                  ? '—'
-                  : healthFactorData.healthFactor?.toFixed(2)}{' '}
-                · Debt ${healthFactorData.totalDebtUSD?.toFixed(2)}
-              </span>
-            )}
+          <div className="flex justify-between items-center">
+            <span>Chain</span>
+            <Select
+              value={selectedChain?.label}
+              onChange={(value) => {
+                const chain = listVerifiedChains().find((c) => c.label === value);
+                if (chain) setSelectedChain(chain);
+              }}
+              style={{ width: 200 }}
+            >
+              {listVerifiedChains().map((chain) => (
+                <Select.Option key={chain.label} value={chain.label}>
+                  {chain.label}
+                </Select.Option>
+              ))}
+            </Select>
           </div>
-          <div className="flex justify-between">
-            <span>Spark</span>
-            {sparkData.loading && <span>Loading…</span>}
-            {sparkData.error && <span className="text-red-forbidden">Error</span>}
-            {!sparkData.loading && !sparkData.error && (
-              <span>
-                HF{' '}
-                {sparkData.healthFactor === 0
-                  ? '—'
-                  : sparkData.healthFactor?.toFixed(2)}{' '}
-                · Debt ${sparkData.totalDebtUSD?.toFixed(2)}
-              </span>
-            )}
-          </div>
-          <div className="flex justify-between">
-            <span>Lido</span>
-            {lidoData.loading && <span>Loading…</span>}
-            {lidoData.error && <span className="text-red-forbidden">Error</span>}
-            {!lidoData.loading && !lidoData.error && (
-              <span>{lidoData.stEthBalance?.toFixed(4)} stETH</span>
-            )}
-          </div>
+
+          {selectedChain?.aaveV3Pool && (
+            <div className="flex justify-between">
+              <span>Aave V3</span>
+              {healthFactorData.loading && <span>Loading…</span>}
+              {healthFactorData.error && (
+                <span className="text-red-forbidden">Error</span>
+              )}
+              {!healthFactorData.loading && !healthFactorData.error && (
+                <span>
+                  HF{' '}
+                  {healthFactorData.healthFactor === 0
+                    ? '—'
+                    : healthFactorData.healthFactor?.toFixed(2)}{' '}
+                  · Debt ${healthFactorData.totalDebtUSD?.toFixed(2)}
+                </span>
+              )}
+            </div>
+          )}
+
+          {selectedChain?.sparkPool && (
+            <div className="flex justify-between">
+              <span>Spark</span>
+              {sparkData.loading && <span>Loading…</span>}
+              {sparkData.error && <span className="text-red-forbidden">Error</span>}
+              {!sparkData.loading && !sparkData.error && (
+                <span>
+                  HF{' '}
+                  {sparkData.healthFactor === 0
+                    ? '—'
+                    : sparkData.healthFactor?.toFixed(2)}{' '}
+                  · Debt ${sparkData.totalDebtUSD?.toFixed(2)}
+                </span>
+              )}
+            </div>
+          )}
+
+          {selectedChain?.lidoStEth && (
+            <div className="flex justify-between">
+              <span>Lido</span>
+              {lidoData.loading && <span>Loading…</span>}
+              {lidoData.error && <span className="text-red-forbidden">Error</span>}
+              {!lidoData.loading && !lidoData.error && (
+                <span>{lidoData.stEthBalance?.toFixed(4)} stETH</span>
+              )}
+            </div>
+          )}
+
           <div className="flex justify-between">
             <span>CoW Swap</span>
             {cowData.loading && <span>Loading…</span>}
@@ -498,6 +614,72 @@ const SmartAutomations = () => {
         </Card>
       )}
 
+      {showTwapForm && (
+        <Card size="small" className="mt-16" title="TWAP settings">
+          <div className="flex flex-col gap-8">
+            <Input
+              placeholder="Sell token address"
+              value={twapForm.sellToken}
+              onChange={(e) =>
+                setTwapForm((f) => ({
+                  ...f,
+                  sellToken: e.target.value,
+                }))
+              }
+            />
+            <Input
+              placeholder="Buy token address"
+              value={twapForm.buyToken}
+              onChange={(e) =>
+                setTwapForm((f) => ({ ...f, buyToken: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Total sell amount (in wei/base units)"
+              value={twapForm.totalSellAmount}
+              onChange={(e) =>
+                setTwapForm((f) => ({ ...f, totalSellAmount: e.target.value }))
+              }
+            />
+            <Input
+              placeholder="Minimum total buy amount (in wei/base units)"
+              value={twapForm.totalBuyAmountMin}
+              onChange={(e) =>
+                setTwapForm((f) => ({ ...f, totalBuyAmountMin: e.target.value }))
+              }
+            />
+            <InputNumber
+              className="w-full"
+              placeholder="Number of parts"
+              value={twapForm.numParts}
+              onChange={(v) =>
+                setTwapForm((f) => ({
+                  ...f,
+                  numParts: typeof v === 'number' ? v : 10,
+                }))
+              }
+            />
+            <InputNumber
+              className="w-full"
+              placeholder="Duration per part (seconds)"
+              value={twapForm.partDurationSeconds}
+              onChange={(v) =>
+                setTwapForm((f) => ({
+                  ...f,
+                  partDurationSeconds: typeof v === 'number' ? v : 3600,
+                }))
+              }
+            />
+            <div className="flex gap-8">
+              <Button type="primary" onClick={handleConfirmTwapForm}>
+                Continue
+              </Button>
+              <Button onClick={handleCancelTwapForm}>Cancel</Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
       <div className="mt-16">
         {workflows.map((w) => (
           <div key={w.workflowId} className="border-b py-8">
@@ -527,7 +709,7 @@ const SmartAutomations = () => {
           visible={showConsent}
           workflowType={AUTOMATIONS[pendingType].label}
           summary={AUTOMATIONS[pendingType].summary(
-            pendingType === 'stop-loss' ? stopLossForm : undefined
+            pendingType === 'stop-loss' ? stopLossForm : pendingType === 'twap' ? twapForm : undefined
           )}
           onConfirm={handleConfirmCreate}
           onCancel={handleCancelConsent}

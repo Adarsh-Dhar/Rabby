@@ -17,28 +17,22 @@
  * for that on-chain and refuses to build an order otherwise, rather than
  * silently producing a signature that will just fail at settlement.
  *
- * ADDRESS VERIFICATION NOTE: the addresses below come from CoW Protocol's
- * published integration docs (docs.cow.fi / the ComposableCoW deployment
- * guide) as of this writing. A separate GitHub issue on the composable-cow
- * repo notes that some historical redeploys produced different addresses,
- * so `verifiedAgainst` and the on-chain code-existence check below are not
- * decorative — re-confirm these against docs.cow.fi before enabling this in
- * anything that touches real funds, and prefer the on-chain check catching
- * a mismatch over trusting this constant blindly.
+ * This module now uses @cowprotocol/sdk-composable for order building
+ * instead of hand-rolled struct encoding, ensuring we get versioned,
+ * security-updated factories instead of manually copied addresses.
  */
+
+import { ComposableCowSDK } from '@cowprotocol/sdk-composable';
+import { OrderBookApi } from '@cowprotocol/cow-sdk';
 
 export interface ComposableCowDeployment {
   chainId: number;
-  composableCow: string;
-  twapHandler: string;
   extensibleFallbackHandler: string;
   verifiedAgainst: string;
 }
 
 export const COMPOSABLE_COW_MAINNET: ComposableCowDeployment = {
   chainId: 1,
-  composableCow: '0xfdaFc9d1902f4e0b84f65F49f244b32b31013b74',
-  twapHandler: '0x6cF1e9cA41f7611dEf408122793c358a3d11E5a5',
   extensibleFallbackHandler: '0x2f55e8b20D0B9FEFA187AA7d00B6Cbe563605bF5',
   verifiedAgainst:
     'docs.cow.fi ComposableCoW integration guide (deployed contracts table) — re-check before production use',
@@ -68,19 +62,16 @@ export interface TwapOrderParams {
 export async function assertSafeReadyForComposableCow(
   safeAddress: string,
   deployment: ComposableCowDeployment,
-  ethCall: (params: { to: string; data: string }) => Promise<string>
+  ethCall: (params: { to: string; data: string }) => Promise<string>,
+  ethGetStorageAt: (address: string, slot: string) => Promise<string>
 ): Promise<{ ready: boolean; reason?: string }> {
   // getStorageAt(safe, FALLBACK_HANDLER_STORAGE_SLOT) — Safe stores its
   // fallback handler in a fixed EIP-1967-style slot. We read it and compare
   // against the ExtensibleFallbackHandler address rather than assuming.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const FALLBACK_HANDLER_SLOT =
     '0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d';
   try {
-    const raw = await ethCall({
-      to: safeAddress,
-      data: `0x0` /* placeholder: real call should be eth_getStorageAt(safeAddress, FALLBACK_HANDLER_SLOT), not eth_call — wire this to the project's provider.getStorageAt equivalent */,
-    });
+    const raw = await ethGetStorageAt(safeAddress, FALLBACK_HANDLER_SLOT);
     const handler = `0x${raw.slice(-40)}`.toLowerCase();
     if (handler !== deployment.extensibleFallbackHandler.toLowerCase()) {
       return {
@@ -103,8 +94,7 @@ export async function assertSafeReadyForComposableCow(
 }
 
 /**
- * Builds the GPv2Order.Data-shaped struct ComposableCoW's TWAP handler
- * expects, plus the ConditionalOrderParams the order is registered under.
+ * Builds a TWAP conditional order using @cowprotocol/sdk-composable.
  * This does NOT sign or submit anything — it hands back data for the
  * existing wallet signing flow (the same EIP-712 signing path Rabby
  * already uses for regular typed-data requests) to sign as an owner
@@ -117,7 +107,10 @@ export async function assertSafeReadyForComposableCow(
  * consent modal (same as any other action node) rather than being treated
  * as a low-stakes read.
  */
-export function buildTwapConditionalOrder(params: TwapOrderParams) {
+export async function buildTwapConditionalOrder(
+  params: TwapOrderParams,
+  chainId: number
+) {
   if (params.numParts < 2) {
     throw new Error('TWAP requires at least 2 parts');
   }
@@ -129,23 +122,64 @@ export function buildTwapConditionalOrder(params: TwapOrderParams) {
       'TWAP totalSellAmount is not evenly divisible by numParts — parts will differ in size'
     );
   }
-  return {
-    handler: COMPOSABLE_COW_MAINNET.twapHandler,
-    staticInput: {
-      sellToken: params.sellToken,
-      buyToken: params.buyToken,
-      receiver: params.receiver,
-      partSellAmount: (
-        BigInt(params.totalSellAmount) / BigInt(params.numParts)
-      ).toString(),
-      minPartLimit: (
-        BigInt(params.totalBuyAmountMin) / BigInt(params.numParts)
-      ).toString(),
-      t0: params.startTimestamp ?? 0, // 0 == start at mining time
-      n: params.numParts,
-      t: params.partDurationSeconds,
-      span: 0, // 0 == part is tradeable for the whole duration
-      appData: params.appData,
-    },
-  };
+
+  const sdk = new ComposableCowSDK(chainId);
+  const order = await sdk.conditionalOrders.createTwapOrder({
+    sellToken: params.sellToken as `0x${string}`,
+    buyToken: params.buyToken as `0x${string}`,
+    receiver: params.receiver as `0x${string}`,
+    sellAmount: BigInt(params.totalSellAmount),
+    buyAmount: BigInt(params.totalBuyAmountMin),
+    numberOfParts: params.numParts,
+    startTime: params.startTimestamp ?? Math.floor(Date.now() / 1000),
+    duration: params.partDurationSeconds * params.numParts,
+    appData: params.appData as `0x${string}`,
+  });
+
+  return order;
+}
+
+/**
+ * Signs and submits a TWAP order to CoW Protocol's orderbook.
+ * This function uses the existing wallet signing infrastructure and
+ * requires the user to approve the signature through the consent modal.
+ *
+ * @param order - The TWAP conditional order built by buildTwapConditionalOrder
+ * @param safeAddress - The Safe address that will place the order
+ * @param chainId - The chain ID
+ * @param signTypedData - The wallet's signTypedData function (from wallet.ts)
+ * @returns The order UID from CoW's orderbook
+ */
+export async function signAndSubmitTwapOrder(
+  order: any,
+  safeAddress: string,
+  chainId: number,
+  signTypedData: (params: {
+    keyringType: string;
+    address: string;
+    typedData: any;
+    approvalComponent?: string;
+  }) => Promise<string>
+): Promise<string> {
+  // Get the EIP-712 typed data for the order
+  const sdk = new ComposableCowSDK(chainId);
+  const typedData = sdk.conditionalOrders.getTypedData(order);
+
+  // Sign the typed data using the existing wallet signing infrastructure
+  // This requires user approval through the consent modal
+  const signature = await signTypedData({
+    keyringType: 'Gnosis',
+    address: safeAddress,
+    typedData,
+    approvalComponent: 'SignTypedData',
+  });
+
+  // Submit the signed order to CoW's orderbook
+  const orderBookApi = new OrderBookApi(chainId);
+  const { id } = await orderBookApi.sendOrder({
+    order,
+    signature,
+  });
+
+  return id;
 }
