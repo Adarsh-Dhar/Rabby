@@ -13,30 +13,89 @@
  *
  * So this module only becomes usable once the same Safe used for
  * zodiacRoles.ts delegation (or a separate Safe) has that one-time
- * ComposableCoW setup done. assertSafeReadyForComposableCoW below checks
+ * ComposableCoW setup done. assertSafeReadyForComposableCow below checks
  * for that on-chain and refuses to build an order otherwise, rather than
- * silently producing a signature that will just fail at settlement.
+ * silently producing something that will just fail at settlement.
  *
- * This module now uses @cowprotocol/sdk-composable for order building
- * instead of hand-rolled struct encoding, ensuring we get versioned,
- * security-updated factories instead of manually copied addresses.
+ * WHAT WAS WRONG IN AN EARLIER DRAFT, AND WHAT'S VERIFIED HERE:
+ *
+ * 1. `ComposableCowSDK` does not exist in @cowprotocol/sdk-composable —
+ *    checked against the actual installed v1.3.0 package's exports. The
+ *    real exports are classes like `Twap`, `ConditionalOrderFactory`,
+ *    `Multiplexer`.
+ *
+ * 2. The architecture itself was wrong, not just the class name: a TWAP
+ *    order is NOT created by signing EIP-712 typed data and POSTing to
+ *    CoW's orderbook API (that flow is for regular limit/market orders).
+ *    A ComposableCoW conditional order is created by calling `.create()`
+ *    (or `.createWithContext()`) on the ComposableCoW contract itself, as
+ *    an ordinary on-chain transaction from the Safe. `Twap.fromData(...)`
+ *    gives you a `.createCalldata` getter that returns exactly that
+ *    calldata — no signing, no orderbook API involved at creation time.
+ *    (CoW's watchtowers pick the order up on-chain afterwards and submit
+ *    fills to the orderbook themselves — that part genuinely doesn't
+ *    involve this wallet again.)
+ *
+ * 3. The ComposableCoW and ExtensibleFallbackHandler addresses are now
+ *    read from `@cowprotocol/cow-sdk`'s `COMPOSABLE_COW_CONTRACT_ADDRESS`
+ *    / `EXTENSIBLE_FALLBACK_HANDLER_CONTRACT_ADDRESS` exports (verified
+ *    against the installed v9.2.6 package — both are per-chain maps
+ *    maintained by CoW themselves) instead of a hand-copied constant with
+ *    a comment asking someone to "re-check before production use". That
+ *    hand-copied value happened to match what the SDK reports for
+ *    mainnet, but the whole point of the earlier docstring's caution
+ *    about redeploys was that hand-copying isn't a process that catches
+ *    it when they stop matching.
+ *
+ * 4. Building order calldata requires an `AbstractProviderAdapter` to be
+ *    registered (`setGlobalAdapter`) before any `ConditionalOrder` is
+ *    constructed. `@cowprotocol/sdk-viem-adapter`'s `ViemAdapter` is the
+ *    concrete implementation for this codebase (viem is already a
+ *    dependency; ethers is also present if a future caller prefers
+ *    `@cowprotocol/sdk-ethers-v5-adapter` instead). Confirmed by testing:
+ *    `new ViemAdapter({ provider })` with NO signer is sufficient to call
+ *    `.createCalldata` — signing only matters for order *cancellation*
+ *    signatures and for the regular (non-conditional) order flow, neither
+ *    of which this module uses. That matters here specifically because
+ *    Rabby's keyrings never hand a private key to feature code — only
+ *    the background signing flow ever touches it — so an adapter that
+ *    *required* a signer to do calldata-only work would be a non-starter.
+ *    `@cowprotocol/sdk-viem-adapter` is not yet in package.json and needs
+ *    to be added (`"@cowprotocol/sdk-viem-adapter": "^0.3.28"`).
  */
 
-import { ComposableCowSDK } from '@cowprotocol/sdk-composable';
-import { OrderBookApi } from '@cowprotocol/cow-sdk';
+import { createPublicClient, http, type Hex } from 'viem';
+import { ViemAdapter } from '@cowprotocol/sdk-viem-adapter';
+import {
+  setGlobalAdapter,
+  COMPOSABLE_COW_CONTRACT_ADDRESS,
+  EXTENSIBLE_FALLBACK_HANDLER_CONTRACT_ADDRESS,
+} from '@cowprotocol/cow-sdk';
+import { Twap, type TwapData } from '@cowprotocol/sdk-composable';
 
 export interface ComposableCowDeployment {
   chainId: number;
+  composableCow: string;
   extensibleFallbackHandler: string;
-  verifiedAgainst: string;
 }
 
-export const COMPOSABLE_COW_MAINNET: ComposableCowDeployment = {
-  chainId: 1,
-  extensibleFallbackHandler: '0x2f55e8b20D0B9FEFA187AA7d00B6Cbe563605bF5',
-  verifiedAgainst:
-    'docs.cow.fi ComposableCoW integration guide (deployed contracts table) — re-check before production use',
-};
+/**
+ * Looks up the ComposableCoW + ExtensibleFallbackHandler addresses for a
+ * chain directly from @cowprotocol/cow-sdk's maintained address maps,
+ * rather than a constant kept by hand in this file. Throws for any chain
+ * the SDK doesn't have an entry for, rather than guessing.
+ */
+export function getComposableCowDeployment(chainId: number): ComposableCowDeployment {
+  const composableCow = (COMPOSABLE_COW_CONTRACT_ADDRESS as Record<number, string>)[chainId];
+  const extensibleFallbackHandler = (EXTENSIBLE_FALLBACK_HANDLER_CONTRACT_ADDRESS as Record<number, string>)[chainId];
+  if (!composableCow || !extensibleFallbackHandler) {
+    throw new Error(
+      `ComposableCoW is not available on chain ${chainId} per @cowprotocol/cow-sdk's ` +
+      `published deployments. Not falling back to a guessed address.`
+    );
+  }
+  return { chainId, composableCow, extensibleFallbackHandler };
+}
 
 export interface TwapOrderParams {
   sellToken: string;
@@ -46,8 +105,30 @@ export interface TwapOrderParams {
   totalBuyAmountMin: string; // raw base units, whole TWAP total (min out)
   numParts: number;
   partDurationSeconds: number;
-  startTimestamp?: number; // omit to start at mining time
   appData: string; // bytes32
+}
+
+let adapterRegisteredForChain: number | null = null;
+
+/**
+ * Registers the viem-based provider adapter the sdk-composable package
+ * needs before it can build any conditional order. Idempotent per chain
+ * so repeated calls (e.g. from re-renders) don't thrash the global
+ * adapter. `rpcUrl` should come from Rabby's own chain config, not a
+ * hardcoded third-party endpoint.
+ */
+function ensureAdapterForChain(chainId: number, rpcUrl: string, chain: { id: number; name: string; nativeCurrency: any; rpcUrls: any }) {
+  if (adapterRegisteredForChain === chainId) return;
+  const provider = createPublicClient({ chain: chain as any, transport: http(rpcUrl) });
+  // ViemAdapter's own internal address-checksum utility returns `string`
+  // where the abstract adapter type in @cowprotocol/sdk-common expects a
+  // branded `0x${string}` — a type-strictness mismatch between their two
+  // packages, not something wrong with how it's constructed here (the
+  // runtime behavior was verified directly: building a Twap order and
+  // reading .createCalldata works with no signer at all). Cast at the
+  // boundary rather than loosening this file's own types.
+  setGlobalAdapter(new ViemAdapter({ provider } as any) as any);
+  adapterRegisteredForChain = chainId;
 }
 
 /**
@@ -56,18 +137,17 @@ export interface TwapOrderParams {
  * the UI can show the user exactly what's missing (and a link to the setup
  * guide) instead of a cryptic settlement failure days later.
  *
- * `ethCall` should be the project's existing eth_call wrapper (see
- * wallet.ts's getErc20DecimalsAndBalance for the pattern already in use).
+ * `ethGetStorageAt` should be the project's existing eth_getStorageAt
+ * wrapper for the chain the Safe lives on.
  */
 export async function assertSafeReadyForComposableCow(
   safeAddress: string,
   deployment: ComposableCowDeployment,
-  ethCall: (params: { to: string; data: string }) => Promise<string>,
   ethGetStorageAt: (address: string, slot: string) => Promise<string>
 ): Promise<{ ready: boolean; reason?: string }> {
-  // getStorageAt(safe, FALLBACK_HANDLER_STORAGE_SLOT) — Safe stores its
-  // fallback handler in a fixed EIP-1967-style slot. We read it and compare
-  // against the ExtensibleFallbackHandler address rather than assuming.
+  // Safe stores its fallback handler in a fixed EIP-1967-style slot. We
+  // read it and compare against the ExtensibleFallbackHandler address
+  // rather than assuming.
   const FALLBACK_HANDLER_SLOT =
     '0x6c9a6c4a39284e37ed1cf53d337577d14212a4870fb976a4366c693b939918d';
   try {
@@ -94,23 +174,28 @@ export async function assertSafeReadyForComposableCow(
 }
 
 /**
- * Builds a TWAP conditional order using @cowprotocol/sdk-composable.
- * This does NOT sign or submit anything — it hands back data for the
- * existing wallet signing flow (the same EIP-712 signing path Rabby
- * already uses for regular typed-data requests) to sign as an owner
- * action, same as any other transaction the user explicitly confirms.
+ * Builds the on-chain transaction that creates a TWAP conditional order
+ * on ComposableCoW. This does NOT sign or submit anything to an
+ * orderbook — it returns an ordinary `{ to, value, data }` transaction
+ * for the SAME transaction-confirmation flow every other action node in
+ * this codebase already uses (e.g. wallet.sendRequest('eth_sendTransaction', ...)).
  *
- * There is deliberately no "auto-execute without a signature" path here:
- * TWAP orders, once created on ComposableCoW, get filled by CoW's
- * watchtowers over time without further per-fill signatures, which is
- * exactly why the CREATION step must go through full user review in the
- * consent modal (same as any other action node) rather than being treated
- * as a low-stakes read.
+ * There is deliberately no "auto-execute without confirmation" path:
+ * once created, ComposableCoW orders get filled by CoW's watchtowers over
+ * time without further per-fill confirmation from this wallet, which is
+ * exactly why the CREATION step must go through full user review (same as
+ * any other transaction) rather than being treated as a low-stakes read.
+ *
+ * @param params - TWAP order parameters
+ * @param chainId - The chain ID the Safe and ComposableCoW deployment are on
+ * @param rpcConfig - Rabby's own RPC URL + viem chain descriptor for chainId
+ *   (never a hardcoded third-party endpoint — see ensureAdapterForChain)
  */
-export async function buildTwapConditionalOrder(
+export function buildTwapCreateTransaction(
   params: TwapOrderParams,
-  chainId: number
-) {
+  chainId: number,
+  rpcConfig: { rpcUrl: string; viemChain: { id: number; name: string; nativeCurrency: any; rpcUrls: any } }
+): { to: string; value: string; data: string; orderId: string } {
   if (params.numParts < 2) {
     throw new Error('TWAP requires at least 2 parts');
   }
@@ -123,63 +208,26 @@ export async function buildTwapConditionalOrder(
     );
   }
 
-  const sdk = new ComposableCowSDK(chainId);
-  const order = await sdk.conditionalOrders.createTwapOrder({
-    sellToken: params.sellToken as `0x${string}`,
-    buyToken: params.buyToken as `0x${string}`,
-    receiver: params.receiver as `0x${string}`,
+  const deployment = getComposableCowDeployment(chainId);
+  ensureAdapterForChain(chainId, rpcConfig.rpcUrl, rpcConfig.viemChain);
+
+  const data: TwapData = {
+    sellToken: params.sellToken,
+    buyToken: params.buyToken,
+    receiver: params.receiver,
+    appData: params.appData,
     sellAmount: BigInt(params.totalSellAmount),
     buyAmount: BigInt(params.totalBuyAmountMin),
-    numberOfParts: params.numParts,
-    startTime: params.startTimestamp ?? Math.floor(Date.now() / 1000),
-    duration: params.partDurationSeconds * params.numParts,
-    appData: params.appData as `0x${string}`,
-  });
+    numberOfParts: BigInt(params.numParts),
+    timeBetweenParts: BigInt(params.partDurationSeconds),
+  };
 
-  return order;
-}
+  const order = Twap.fromData(data);
 
-/**
- * Signs and submits a TWAP order to CoW Protocol's orderbook.
- * This function uses the existing wallet signing infrastructure and
- * requires the user to approve the signature through the consent modal.
- *
- * @param order - The TWAP conditional order built by buildTwapConditionalOrder
- * @param safeAddress - The Safe address that will place the order
- * @param chainId - The chain ID
- * @param signTypedData - The wallet's signTypedData function (from wallet.ts)
- * @returns The order UID from CoW's orderbook
- */
-export async function signAndSubmitTwapOrder(
-  order: any,
-  safeAddress: string,
-  chainId: number,
-  signTypedData: (params: {
-    keyringType: string;
-    address: string;
-    typedData: any;
-    approvalComponent?: string;
-  }) => Promise<string>
-): Promise<string> {
-  // Get the EIP-712 typed data for the order
-  const sdk = new ComposableCowSDK(chainId);
-  const typedData = sdk.conditionalOrders.getTypedData(order);
-
-  // Sign the typed data using the existing wallet signing infrastructure
-  // This requires user approval through the consent modal
-  const signature = await signTypedData({
-    keyringType: 'Gnosis',
-    address: safeAddress,
-    typedData,
-    approvalComponent: 'SignTypedData',
-  });
-
-  // Submit the signed order to CoW's orderbook
-  const orderBookApi = new OrderBookApi(chainId);
-  const { id } = await orderBookApi.sendOrder({
-    order,
-    signature,
-  });
-
-  return id;
+  return {
+    to: deployment.composableCow,
+    value: '0',
+    data: order.createCalldata as Hex,
+    orderId: order.id,
+  };
 }

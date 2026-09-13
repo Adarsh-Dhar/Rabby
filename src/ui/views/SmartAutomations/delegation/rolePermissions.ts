@@ -10,13 +10,33 @@
  * has a corresponding xPermissions() function that returns the exact
  * permissions needed for that workflow.
  *
- * NOTE: This is a simplified implementation. The full zodiac-roles-sdk
- * integration would use the SDK's domain-specific builders and planApplyRole
- * to generate the exact calldata. For now, this provides the structure
- * and can be extended with the full SDK integration later.
+ * PERMISSION MODEL, READ FIRST:
+ * zodiac-roles-sdk (checked against the installed v4.1.3 package) does NOT
+ * export a `planApplyRole` function — that was an incorrect assumption in
+ * an earlier draft of this file. What it does export is `rolesAbi`, the
+ * real Roles Modifier contract ABI, which includes `allowFunction` and
+ * `allowTarget` — the actual on-chain calls that grant a role permission
+ * to call a given function selector (or, for allowTarget, ANY function) on
+ * a given contract, with no argument-level scoping.
+ *
+ * `allowFunction`/`allowTarget` are single-target calls with no batch
+ * variant on the Modifier contract itself, so applying N permissions is N
+ * separate transactions (or one Safe multiSend batch built by the caller
+ * from this array) — not one omnibus "apply role" call. Hence
+ * buildApplyRoleTransactions (plural) returns an array, one tx per
+ * PermissionTarget, instead of pretending a single call can do it.
+ *
+ * This is deliberately coarser than full zodiac-roles-sdk parameter
+ * scoping (e.g. capping the `amount` argument of an approve() call).
+ * Doing real argument scoping means going through `scopeFunction` with a
+ * `Condition` tree, which is a much larger surface to get right; shipping
+ * allowFunction first (scoped to contract + selector, not scoped to
+ * arguments) is a real, working, minimal permission — not a placeholder —
+ * and argument-level scoping can be layered on later.
  */
 
-import { encodeFunctionData } from 'viem';
+import { encodeFunctionData, type Hex } from 'viem';
+import { rolesAbi, ExecutionOptions } from 'zodiac-roles-sdk';
 
 export interface PermissionTarget {
   address: string;
@@ -82,7 +102,7 @@ export function liquidationShieldPermissions(
     args: [
       usdcAddress as `0x${string}`,
       BigInt(capAmount), // This would be the actual debt amount in practice
-      1, // Stable rate
+      1n, // Stable rate (uint256 — must be bigint, not number, for viem)
       '0x0000000000000000000000000000000000000000' as `0x${string}`, // Would be the Safe address
     ],
   });
@@ -269,8 +289,11 @@ export function yieldHarvesterPermissions(
     abi: AAVE_CLAIM_REWARDS_ABI,
     functionName: 'claimRewards',
     args: [
-      ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48'] as `0x${string}[]`, // USDC placeholder
-      BigInt('0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'),
+      ['0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as `0x${string}`], // USDC placeholder
+      // MAX_UINT256 (2**256 - 1) — the earlier draft had 66 hex digits
+      // here instead of 64, which overflows uint256 and would throw at
+      // encode time. `2n ** 256n - 1n` can't have this class of typo.
+      2n ** 256n - 1n,
       '0x0000000000000000000000000000000000000000' as `0x${string}`, // Would be the Safe address
     ],
   });
@@ -285,40 +308,57 @@ export function yieldHarvesterPermissions(
 }
 
 /**
- * Builds the complete apply-role transaction for a given permission set.
- * This returns the actual transaction that the user needs to sign to
- * apply the role to their Roles Modifier.
+ * Builds one `allowFunction` transaction per permission target, granting
+ * the role the ability to call exactly that (target, function selector)
+ * pair on the Roles Modifier — nothing else. This is the real, on-chain
+ * effective operation; there is no single-call "apply the whole set"
+ * shortcut on the Modifier contract (see module docstring above).
+ *
+ * Each returned transaction must be sent (and mined) separately by the
+ * Safe that owns the Modifier — the caller (DelegationSettings.tsx) is
+ * responsible for sending them in sequence through Rabby's existing
+ * transaction flow, or batching them into a single Safe multiSend
+ * transaction if it already has that capability.
  *
  * @param roleKey - The bytes32 role key
- * @param permissions - The permission targets
- * @param rolesModifierAddress - The Roles Modifier address
- * @param chainId - The chain ID
- * @returns The apply-role transaction object
+ * @param permissions - The permission targets to grant
+ * @param rolesModifierAddress - The Roles Modifier address (call target)
+ * @returns One `{ to, value, data }` transaction per permission, in order
  */
-export async function buildApplyRoleTransaction(
+export function buildApplyRoleTransactions(
   roleKey: string,
   permissions: PermissionTarget[],
-  rolesModifierAddress: string,
-  chainId: number
-): Promise<{ to: string; value: string; data: string }> {
-  // TODO: Implement actual applyRole encoding using the zodiac-roles-sdk
-  // The SDK's planApplyRole function generates the exact calldata needed
-  // For now, return a placeholder structure that shows the intended flow
+  rolesModifierAddress: string
+): { to: string; value: string; data: string }[] {
+  if (!/^0x[a-fA-F0-9]{64}$/.test(roleKey)) {
+    throw new Error(`roleKey must be a bytes32 hex string, got: ${roleKey}`);
+  }
 
-  const targets = permissions.map((p) => p.address);
-  const values = permissions.map((p) => p.value);
-  const calldatas = permissions.map((p) => p.data);
+  return permissions.map((permission) => {
+    if (!/^0x[a-fA-F0-9]*$/.test(permission.data) || permission.data.length < 10) {
+      throw new Error(
+        `Permission for ${permission.address} has no usable function selector ` +
+        `in its data field (${permission.data}) — cannot scope allowFunction to it.`
+      );
+    }
+    const selector = permission.data.slice(0, 10) as Hex;
 
-  // This would be replaced with actual zodiac-roles-sdk planApplyRole call:
-  // const { calldata } = await planApplyRole({
-  //   key: roleKey,
-  //   targets: { address: targets, value: values, data: calldatas },
-  // }, { chainId, address: rolesModifierAddress });
+    const data = encodeFunctionData({
+      abi: rolesAbi,
+      functionName: 'allowFunction',
+      args: [
+        roleKey as Hex,
+        permission.address as Hex,
+        selector,
+        ExecutionOptions.None,
+      ],
+    });
 
-  return {
-    to: rolesModifierAddress,
-    value: '0',
-    data: '0x', // Placeholder - would be actual calldata from planApplyRole
-  };
+    return {
+      to: rolesModifierAddress,
+      value: '0',
+      data,
+    };
+  });
 }
 

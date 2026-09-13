@@ -3,11 +3,12 @@ import { Input, Button, Alert, Typography, Space, Collapse, Steps, Card, message
 import {
   predictSafeAddress,
   buildSafeDeploymentTransaction,
-  buildAttachRolesModifierTransaction,
   isRolesModifierEnabled,
+  fetchKnownRolesModifier,
+  type Eip1193Provider,
 } from '../delegation/safeDeployment';
 import {
-  buildApplyRoleTransaction,
+  buildApplyRoleTransactions,
   liquidationShieldPermissions,
   stopLossPermissions,
   twapPermissions,
@@ -29,11 +30,30 @@ interface DelegationSettingsProps {
   onSave: (value: DelegationSettingsValue) => void;
   onClear: () => void;
   saving?: boolean;
-  wallet?: any; // Wallet service for signing transactions
+  wallet?: any; // Wallet service for signing/sending transactions and RPC calls
   accountAddress?: string;
+  /** Rabby's chain identifier (serverId, e.g. 'eth') for requestETHRpc calls */
+  chainServerId?: string;
+  /** Numeric chain ID (e.g. 1 for mainnet), for the subgraph cross-check */
+  chainId?: number;
 }
 
 const isAddress = (v: string) => /^0x[a-fA-F0-9]{40}$/.test(v.trim());
+
+/**
+ * Wraps Rabby's own wallet.requestETHRpc in the minimal EIP-1193 shape
+ * that @safe-global/protocol-kit's `Safe.init({ provider })` expects,
+ * instead of pointing protocol-kit at a hardcoded third-party RPC
+ * endpoint (an earlier draft used `https://rpc.ankr.com/eth`, which is
+ * wrong for any chain but mainnet and bypasses whatever RPC config/rate
+ * limits the user's own Rabby setup already has).
+ */
+function makeEip1193Provider(wallet: any, chainServerId: string): Eip1193Provider {
+  return {
+    request: ({ method, params }) =>
+      wallet.requestETHRpc({ method, params }, chainServerId),
+  };
+}
 
 /**
  * Lets the user opt Smart Automations into executing through a Safe +
@@ -44,6 +64,18 @@ const isAddress = (v: string) => /^0x[a-fA-F0-9]{40}$/.test(v.trim());
  * every value here moves real funds if wrong, so there's nothing to
  * pre-fill safely. See delegation/zodiacRoles.ts for what happens with
  * these values once saved.
+ *
+ * GUIDED SETUP, WHAT IT CAN AND CAN'T AUTOMATE:
+ * Safe deployment is fully programmatic (Rabby already depends on
+ * @safe-global/protocol-kit for Gnosis Safe support elsewhere). Deploying
+ * a NEW Zodiac Roles Modifier is NOT — neither zodiac-roles-sdk nor
+ * zodiac-roles-deployments (the two packages this feature depends on)
+ * publishes a factory/mastercopy address for any chain, so there is no
+ * verified way to build that deployment transaction from inside Rabby.
+ * An earlier draft faked this step with `message.info('Would attach
+ * Roles Modifier...')` and marked setup "complete" without deploying
+ * anything — that's worse than just being honest that this one step
+ * needs the user to visit app.roles.gnosisguild.org themselves.
  */
 export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
   value,
@@ -52,6 +84,8 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
   saving,
   wallet,
   accountAddress,
+  chainServerId,
+  chainId,
 }) => {
   const [safeAddress, setSafeAddress] = useState(value?.safeAddress ?? '');
   const [rolesModifierAddress, setRolesModifierAddress] = useState(
@@ -64,8 +98,16 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
   const [guidedSetupStep, setGuidedSetupStep] = useState(0);
   const [predictedSafeAddress, setPredictedSafeAddress] = useState('');
   const [isPredictingSafe, setIsPredictingSafe] = useState(false);
+  const [isDeployingSafe, setIsDeployingSafe] = useState(false);
+  const [isApplyingPermissions, setIsApplyingPermissions] = useState(false);
   const [selectedWorkflowType, setSelectedWorkflowType] = useState<string>('liquidation-shield');
   const [approveAmount, setApproveAmount] = useState('');
+  // Step 3 (Roles Modifier) is manual — the user pastes what they deployed
+  // at app.roles.gnosisguild.org, and we verify it on-chain before letting
+  // them proceed to applying permissions.
+  const [pastedRolesModifier, setPastedRolesModifier] = useState('');
+  const [isVerifyingRolesModifier, setIsVerifyingRolesModifier] = useState(false);
+  const [pastedRoleKey, setPastedRoleKey] = useState('');
 
   const valid =
     isAddress(safeAddress) &&
@@ -73,57 +115,102 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
     /^0x[a-fA-F0-9]{64}$/.test(roleKey.trim());
 
   const handlePredictSafe = async () => {
-    if (!accountAddress) {
-      message.error('No account address available');
+    if (!accountAddress || !wallet || !chainServerId) {
+      message.error('No account, wallet, or chain available');
       return;
     }
     setIsPredictingSafe(true);
     try {
-      const predicted = await predictSafeAddress(accountAddress, 1);
+      const provider = makeEip1193Provider(wallet, chainServerId);
+      const predicted = await predictSafeAddress(accountAddress, provider);
       setPredictedSafeAddress(predicted);
       setGuidedSetupStep(1);
     } catch (e) {
-      message.error('Failed to predict Safe address');
+      message.error(`Failed to predict Safe address: ${e.message}`);
     } finally {
       setIsPredictingSafe(false);
     }
   };
 
   const handleDeploySafe = async () => {
-    if (!accountAddress || !wallet) {
-      message.error('No wallet or account available');
+    if (!accountAddress || !wallet || !chainServerId) {
+      message.error('No wallet, account, or chain available');
       return;
     }
+    setIsDeployingSafe(true);
     try {
-      const tx = await buildSafeDeploymentTransaction(accountAddress, 1);
-      // This would call wallet's transaction signing flow
-      // For now, just show the transaction details
-      message.info(`Would deploy Safe with address: ${predictedSafeAddress}`);
+      const provider = makeEip1193Provider(wallet, chainServerId);
+      const tx = await buildSafeDeploymentTransaction(accountAddress, provider);
+      // Actually send it through Rabby's real transaction confirmation
+      // flow — an earlier draft only built this transaction and then
+      // showed message.info('Would deploy Safe...') without sending it,
+      // so nothing was ever deployed even after the user "completed" setup.
+      await wallet.sendRequest({
+        method: 'eth_sendTransaction',
+        params: [{ from: accountAddress, to: tx.to, value: tx.value, data: tx.data }],
+      });
       setGuidedSetupStep(2);
     } catch (e) {
-      message.error('Failed to build Safe deployment transaction');
+      message.error(`Failed to deploy Safe: ${e.message}`);
+    } finally {
+      setIsDeployingSafe(false);
     }
   };
 
-  const handleAttachRolesModifier = async () => {
-    if (!predictedSafeAddress || !wallet) {
-      message.error('No Safe address or wallet available');
+  const handleVerifyRolesModifier = async () => {
+    if (!predictedSafeAddress || !wallet || !chainServerId) {
+      message.error('No Safe address, wallet, or chain available');
       return;
     }
+    if (!isAddress(pastedRolesModifier)) {
+      message.error('Enter a valid Roles Modifier address');
+      return;
+    }
+    setIsVerifyingRolesModifier(true);
     try {
-      const tx = await buildAttachRolesModifierTransaction(predictedSafeAddress, 1);
-      message.info('Would attach Roles Modifier to Safe');
+      const enabled = await isRolesModifierEnabled(
+        predictedSafeAddress,
+        pastedRolesModifier,
+        (params) =>
+          wallet.requestETHRpc({ method: 'eth_call', params: [params, 'latest'] }, chainServerId)
+      );
+      if (!enabled) {
+        message.error(
+          'This address is not enabled as a module on your Safe yet. ' +
+          'Finish attaching it at app.roles.gnosisguild.org first.'
+        );
+        return;
+      }
+      // Best-effort cross-check against the subgraph; absence isn't fatal
+      // (very recent deployments may not be indexed yet, or chainId
+      // wasn't passed in), so this only informs, it doesn't block.
+      if (chainId) {
+        const known = await fetchKnownRolesModifier(chainId, pastedRolesModifier);
+        if (!known) {
+          message.info(
+            "Verified on-chain that this module is enabled — the subgraph hasn't indexed it yet, which is normal for a recent deployment."
+          );
+        }
+      }
+      setRolesModifierAddress(pastedRolesModifier);
       setGuidedSetupStep(3);
     } catch (e) {
-      message.error('Failed to build Roles Modifier attachment transaction');
+      message.error(`Could not verify Roles Modifier: ${e.message}`);
+    } finally {
+      setIsVerifyingRolesModifier(false);
     }
   };
 
   const handleApplyPermissions = async () => {
-    if (!predictedSafeAddress || !rolesModifierAddress || !wallet) {
-      message.error('Missing addresses or wallet');
+    if (!predictedSafeAddress || !rolesModifierAddress || !wallet || !pastedRoleKey) {
+      message.error('Missing addresses, role key, or wallet');
       return;
     }
+    if (!/^0x[a-fA-F0-9]{64}$/.test(pastedRoleKey.trim())) {
+      message.error('Role key must be a bytes32 hex value');
+      return;
+    }
+    setIsApplyingPermissions(true);
     try {
       let permissions;
       switch (selectedWorkflowType) {
@@ -162,16 +249,28 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
           return;
       }
 
-      const tx = await buildApplyRoleTransaction(
-        roleKey || '0x' + '0'.repeat(64),
+      // One allowFunction transaction per permission target (see
+      // rolePermissions.ts — there is no single "apply the whole set"
+      // call on the Modifier contract). Send them one at a time through
+      // Rabby's real confirmation flow instead of building-and-discarding
+      // like the earlier draft did.
+      const txs = buildApplyRoleTransactions(
+        pastedRoleKey.trim(),
         permissions,
-        rolesModifierAddress,
-        1
+        rolesModifierAddress
       );
-      message.info('Would apply role permissions');
+      for (const tx of txs) {
+        await wallet.sendRequest({
+          method: 'eth_sendTransaction',
+          params: [{ from: predictedSafeAddress, to: tx.to, value: tx.value, data: tx.data }],
+        });
+      }
+      setRoleKey(pastedRoleKey.trim());
       setGuidedSetupStep(4);
     } catch (e) {
-      message.error('Failed to build apply-role transaction');
+      message.error(`Failed to apply role permissions: ${e.message}`);
+    } finally {
+      setIsApplyingPermissions(false);
     }
   };
 
@@ -221,6 +320,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
           {guidedSetupStep === 0 && (
             <div style={{ marginTop: 16 }}>
               <Text>Safe will be deployed with this account as the sole owner.</Text>
+              <br />
               <Button
                 type="primary"
                 onClick={handlePredictSafe}
@@ -240,9 +340,16 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
           {guidedSetupStep === 1 && (
             <div style={{ marginTop: 16 }}>
               <Text>Safe address: {predictedSafeAddress}</Text>
+              <br />
+              <Text type="secondary">
+                This sends a real deployment transaction — review it in the
+                confirmation prompt before approving.
+              </Text>
+              <br />
               <Button
                 type="primary"
                 onClick={handleDeploySafe}
+                loading={isDeployingSafe}
                 style={{ marginTop: 8 }}
               >
                 Deploy Safe
@@ -252,20 +359,54 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
 
           {guidedSetupStep === 2 && (
             <div style={{ marginTop: 16 }}>
-              <Text>Safe deployed. Now attaching Roles Modifier...</Text>
+              <Alert
+                type="warning"
+                showIcon
+                message="This step can't be automated"
+                description={
+                  <Text>
+                    Rabby has no verified factory address to deploy a new
+                    Zodiac Roles Modifier from — deploying and attaching one
+                    has to happen at{' '}
+                    <Link href="https://app.roles.gnosisguild.org" target="_blank">
+                      app.roles.gnosisguild.org
+                    </Link>
+                    , using your Safe address ({predictedSafeAddress}) as the
+                    avatar. Once it's attached, paste its address below and
+                    Rabby will confirm on-chain that it's actually enabled
+                    before continuing.
+                  </Text>
+                }
+                style={{ marginBottom: 8 }}
+              />
+              <Text strong>Roles Modifier address</Text>
+              <Input
+                placeholder="0x..."
+                value={pastedRolesModifier}
+                onChange={(e) => setPastedRolesModifier(e.target.value)}
+              />
               <Button
                 type="primary"
-                onClick={handleAttachRolesModifier}
+                onClick={handleVerifyRolesModifier}
+                loading={isVerifyingRolesModifier}
                 style={{ marginTop: 8 }}
               >
-                Attach Roles Modifier
+                Verify & Continue
               </Button>
             </div>
           )}
 
           {guidedSetupStep === 3 && (
             <div style={{ marginTop: 16 }}>
-              <Text>Roles Modifier attached. Now applying permissions...</Text>
+              <Text>Roles Modifier verified. Now applying permissions...</Text>
+              <div style={{ marginTop: 8 }}>
+                <Text strong>Role key (bytes32)</Text>
+                <Input
+                  placeholder="0x..."
+                  value={pastedRoleKey}
+                  onChange={(e) => setPastedRoleKey(e.target.value)}
+                />
+              </div>
               <div style={{ marginTop: 8 }}>
                 <Text>Workflow type:</Text>
                 <select
@@ -288,9 +429,15 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
                   style={{ width: 200, marginLeft: 8 }}
                 />
               </div>
+              <Text type="secondary">
+                This sends one transaction per permission — you'll get a
+                confirmation prompt for each.
+              </Text>
+              <br />
               <Button
                 type="primary"
                 onClick={handleApplyPermissions}
+                loading={isApplyingPermissions}
                 style={{ marginTop: 8 }}
               >
                 Apply Permissions
@@ -302,17 +449,23 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
             <div style={{ marginTop: 16 }}>
               <Alert
                 type="success"
-                message="Setup complete!"
-                description="Your Safe + Roles Modifier is now configured. You can now create automations that will execute through this role."
+                message="Setup complete"
+                description="Your Safe + Roles Modifier is now configured and the permissions have been applied on-chain. You can now create automations that will execute through this role."
               />
               <Button
+                type="primary"
                 onClick={() => {
+                  onSave({
+                    safeAddress: predictedSafeAddress,
+                    rolesModifierAddress,
+                    roleKey,
+                  });
                   setShowGuidedSetup(false);
                   setGuidedSetupStep(0);
                 }}
-                style={{ marginTop: 8 }}
+                style={{ marginTop: 8, marginRight: 8 }}
               >
-                Done
+                Save & Done
               </Button>
             </div>
           )}
