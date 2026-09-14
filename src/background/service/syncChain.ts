@@ -60,7 +60,7 @@ class SyncChainService {
       });
       this.store.updatedAt = Date.now();
     } catch (e) {
-      console.error('fetch chain list error: ', e);
+      console.error('fetch chain list error: ', e instanceof Error ? e.message : String(e));
     }
   };
 

@@ -74,14 +74,14 @@ const open = (
         onCancel && onCancel();
       };
       root.render(
-        <Popup visible={false} onClose={handleCancel} {...props}>
+        <Popup open={false} onClose={handleCancel} {...props}>
           {content}
         </Popup>
       );
       if (visible) {
         setTimeout(() => {
           root.render(
-            <Popup visible={visible} onClose={handleCancel} {...props}>
+            <Popup open={visible} onClose={handleCancel} {...props}>
               {content}
             </Popup>
           );
@@ -93,7 +93,7 @@ const open = (
   function close() {
     render({
       visible: false,
-      afterVisibleChange: (v) => {
+      afterOpenChange: (v) => {
         if (!v) {
           destroy();
         }

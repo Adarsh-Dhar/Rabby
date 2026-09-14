@@ -502,7 +502,7 @@ export const SignMainnetCustomGasSheet = ({
     <Popup
       isNew
       height="auto"
-      visible={visible}
+      open={visible}
       title={t('page.signTx.gasSelectorTitle')}
       className={clsx('gas-modal', uiType.isPop && 'is-popup')}
       onCancel={handleClose}

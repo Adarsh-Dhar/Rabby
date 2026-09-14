@@ -107,7 +107,7 @@ export const MiniTypedDataApprovalV2: React.FC<{
       <>
         <Popup
           height={'fit-content'}
-          visible={status === 'error' && !!error}
+          open={status === 'error' && !!error}
           bodyStyle={{ padding: 0 }}
           getContainer={desktopMiniSignerGetContainer}
           push={false}
@@ -184,7 +184,7 @@ export const MiniTypedDataApprovalV2: React.FC<{
     <>
       <Popup
         height={'fit-content'}
-        visible={status === 'error' && !!error}
+        open={status === 'error' && !!error}
         bodyStyle={{ padding: 0 }}
         getContainer={config?.getContainer}
         push={false}
@@ -205,7 +205,7 @@ export const MiniTypedDataApprovalV2: React.FC<{
         placement="bottom"
         height="fit-content"
         className="is-support-darkmode"
-        visible={showPopup}
+        open={showPopup}
         onClose={handleClose}
         maskClosable={false}
         closable={false}

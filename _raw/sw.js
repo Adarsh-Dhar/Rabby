@@ -128,18 +128,27 @@ const createOffscreen = async () => {
     return;
   }
 
-  if (await chrome.offscreen.hasDocument()) {
-    return;
+  try {
+    if (await chrome.offscreen.hasDocument()) {
+      return;
+    }
+
+    await chrome.offscreen.createDocument({
+      url: './offscreen.html',
+      reasons: ['IFRAME_SCRIPTING'],
+      justification:
+        'Used for Hardware Wallet to communicate with the extension.',
+    });
+
+    console.debug('Offscreen iframe loaded');
+  } catch (error) {
+    // Handle DOMException when document already exists or other errors
+    if (error.name === 'DOMException' || error.message?.includes('already exists')) {
+      console.debug('Offscreen document already exists or creation failed, continuing...');
+    } else {
+      console.error('Failed to create offscreen document:', error);
+    }
   }
-
-  await chrome.offscreen.createDocument({
-    url: './offscreen.html',
-    reasons: ['IFRAME_SCRIPTING'],
-    justification:
-      'Used for Hardware Wallet to communicate with the extension.',
-  });
-
-  console.debug('Offscreen iframe loaded');
 };
 
 const keepAlive = () => {

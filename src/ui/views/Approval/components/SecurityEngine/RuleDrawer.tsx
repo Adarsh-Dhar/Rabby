@@ -309,7 +309,7 @@ const RuleDrawer = ({
 
   return (
     <Popup
-      visible={visible}
+      open={visible}
       onClose={handleClose}
       height="auto"
       className="rule-detail-modal"

@@ -106,7 +106,7 @@ export const MiniTypedDataApproval = ({
         placement="bottom"
         height="fit-content"
         className="is-support-darkmode"
-        visible={innerVisible}
+        open={innerVisible}
         onClose={handleClose}
         maskClosable={status === 'idle'}
         closable={false}

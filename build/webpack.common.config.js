@@ -388,6 +388,7 @@ const config = {
       dexie$: paths.rootResolve(`node_modules/dexie/${DEXIE_IMPORT_WRAPPER}`),
       moment: require.resolve('dayjs'),
       '@debank/common': require.resolve('@debank/common/dist/index-rabby'),
+      'uint8arrays/esm': require.resolve('uint8arrays'),
     },
     plugins: [new TSConfigPathsPlugin()],
     fallback: {

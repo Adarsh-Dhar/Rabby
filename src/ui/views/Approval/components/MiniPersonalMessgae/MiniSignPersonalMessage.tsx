@@ -113,7 +113,7 @@ export const MiniPersonalMessageApproval = ({
         placement="bottom"
         height="fit-content"
         className="is-support-darkmode"
-        visible={directSubmit ? innerVisible : visible}
+        open={directSubmit ? innerVisible : visible}
         onClose={handleClose}
         maskClosable={status === 'idle'}
         closable={false}

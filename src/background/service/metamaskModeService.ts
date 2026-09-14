@@ -51,7 +51,7 @@ class MetamaskModeService {
       this.store.sites = sites;
       this.store.updatedAt = Date.now();
     } catch (e) {
-      console.error('fetch metamask list error: ', e);
+      console.error('fetch metamask list error: ', e instanceof Error ? e.message : String(e));
     }
   };
 

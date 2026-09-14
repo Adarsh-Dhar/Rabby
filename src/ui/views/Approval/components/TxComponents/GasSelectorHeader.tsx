@@ -972,7 +972,7 @@ const GasSelectorHeader = ({
       <Popup
         isNew
         height={'auto'}
-        visible={modalVisible}
+        open={modalVisible}
         title={t('page.signTx.gasSelectorTitle')}
         className={clsx('gas-modal', uiType.isPop && 'is-popup')}
         onCancel={handleClosePopup}

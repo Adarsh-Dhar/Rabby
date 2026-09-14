@@ -311,7 +311,7 @@ export const SignMainnetSwapGasQuotePopup = ({
   return (
     <>
       <Popup
-        visible={visible}
+        open={visible}
         onCancel={() => onVisibleChange(false)}
         height={571}
         closable={false}
@@ -420,7 +420,7 @@ export const SignMainnetSwapGasQuotePopup = ({
 
       <Popup
         isNew
-        visible={tempoGasTokenVisible}
+        open={tempoGasTokenVisible}
         title={t('page.gasAccount.gasToken')}
         onCancel={() => setTempoGasTokenVisible(false)}
         destroyOnClose

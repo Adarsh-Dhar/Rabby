@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { parseUnits } from 'viem';
 import { PageHeader } from '@/ui/component';
 import { useWallet } from '@/ui/utils';
 import { useCurrentAccount } from '@/ui/hooks/backgroundState/useAccount';
@@ -9,9 +8,6 @@ import {
   buildYieldHarvesterWorkflow,
   buildStopLossWorkflow,
   buildTwapWorkflow,
-  scopeApproveNodeAmounts,
-  USDC_ADDRESS,
-  MAX_UINT256,
 } from '../workflowTemplates';
 import { listVerifiedChains, type ChainContracts } from '../chainRegistry';
 import {
@@ -58,35 +54,27 @@ interface AutomationConfig {
   build: (
     address: string,
     stopLossParams?: StopLossParams,
-    twapParams?: TwapParams,
-    approveAmount?: string
+    twapParams?: TwapParams
   ) => Promise<{ nodes: any[]; edges: any[] }>;
   summary: (stopLossParams?: StopLossParams, twapParams?: TwapParams) => WorkflowConsentSummary;
   // Stop-loss and TWAP need small forms filled in before we can build the workflow.
   needsForm?: boolean;
-  // Token being approved for this automation's approve node, if any. Used to
-  // drive the scoped-amount control in the consent modal — omit for
-  // automations (like yield-harvester) that don't spend the user's tokens.
-  approveToken?: (stopLossParams?: StopLossParams, twapParams?: TwapParams) => string | undefined;
+  approveToken?: (params?: StopLossParams | TwapParams) => string;
 }
 
 const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
   'liquidation-shield': {
     label: 'Liquidation Shield (HF < 1.15)',
-    build: (address, _stopLossParams, _twapParams, approveAmount) =>
+    build: (address) =>
       buildLiquidationShieldWorkflow({
         address,
         healthFactorThreshold: 1.15,
-        approveAmount,
       }),
-    approveToken: () => USDC_ADDRESS,
     summary: () => ({
       protocol: 'Aave V3',
-      action: 'Approve + repay debt',
-      maxAmount: 'Full USDC debt balance (unlimited approval)',
+      action: 'Web3 contract-based debt repayment',
       triggerCondition: 'Health Factor < 1.15',
       chain: 'Ethereum',
-      tokenSymbol: 'USDC',
     }),
   },
   'yield-harvester': {
@@ -99,7 +87,7 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
       buildYieldHarvesterWorkflow({ address, protocols: ['aave-v3'] }),
     summary: () => ({
       protocol: 'Aave V3',
-      action: 'Claim rewards to your wallet',
+      action: 'Web3 contract-based reward claiming',
       maxAmount: 'All accrued rewards above gas threshold',
       triggerCondition: 'Rewards > gas-efficient threshold',
       chain: 'Ethereum',
@@ -108,8 +96,7 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
   'stop-loss': {
     label: 'Stop-Loss (Uniswap v3)',
     needsForm: true,
-    approveToken: (stopLossParams) => stopLossParams?.tokenAddress,
-    build: (address, stopLossParams, _twapParams, approveAmount) => {
+    build: (address, stopLossParams, _twapParams) => {
       if (!stopLossParams) {
         throw new Error('Stop-loss requires token, threshold, and target token');
       }
@@ -118,26 +105,22 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
         tokenAddress: stopLossParams.tokenAddress,
         thresholdPrice: stopLossParams.thresholdPrice,
         targetToken: stopLossParams.targetToken,
-        approveAmount,
       });
     },
     summary: (stopLossParams) => ({
       protocol: 'Uniswap V3',
-      action: 'Approve + swap to target token',
-      maxAmount: 'Full position (unlimited approval)',
+      action: 'Web3 contract-based stop-loss swap',
       triggerCondition: stopLossParams
         ? `Price of ${stopLossParams.tokenAddress.slice(0, 8)}… below ${
             stopLossParams.thresholdPrice
           }`
         : 'Price below threshold',
       chain: 'Ethereum',
-      tokenSymbol: 'the watched token',
     }),
   },
   'twap': {
-    label: 'TWAP (CoW Protocol)',
+    label: 'TWAP (Uniswap v3)',
     needsForm: true,
-    approveToken: (stopLossParams, twapParams) => twapParams?.sellToken,
     build: (address, _stopLossParams, twapParams) => {
       if (!twapParams) {
         throw new Error('TWAP requires sell token, buy token, amount, parts, and duration');
@@ -153,11 +136,8 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
       });
     },
     summary: (stopLossParams, twapParams) => ({
-      protocol: 'CoW Protocol',
-      action: 'Create TWAP order',
-      maxAmount: twapParams
-        ? `${twapParams.totalSellAmount} ${twapParams.sellToken.slice(0, 8)}…`
-        : 'Total sell amount',
+      protocol: 'Uniswap V3',
+      action: 'AI-generated TWAP swap',
       triggerCondition: twapParams
         ? `${twapParams.numParts} parts over ${twapParams.partDurationSeconds}s each`
         : 'TWAP schedule',
@@ -186,32 +166,20 @@ const SmartAutomations = () => {
     edges: any[];
   } | null>(null);
 
-  // Scoped-approval state for the consent modal. `decimals` is fetched for
-  // whichever token the pending automation approves, so the human-entered
-  // amount can be converted to the raw base-unit string the approve node
-  // needs. Defaults to unlimited=true is intentionally NOT the default —
-  // the person has to actively opt into unlimited approval.
-  const [approveDecimals, setApproveDecimals] = useState<number | null>(null);
-  const [approveAmountInput, setApproveAmountInput] = useState('');
-  const [unlimitedApproval, setUnlimitedApproval] = useState(false);
-  const [approveAmountError, setApproveAmountError] = useState<string | null>(
-    null
-  );
-
   // Stop-loss form state
   const [stopLossForm, setStopLossForm] = useState<StopLossParams>({
-    tokenAddress: '',
-    thresholdPrice: 0,
-    targetToken: '',
+    tokenAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
+    thresholdPrice: 2000,
+    targetToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
   });
   const [showStopLossForm, setShowStopLossForm] = useState(false);
 
   // TWAP form state
   const [twapForm, setTwapForm] = useState<TwapParams>({
-    sellToken: '',
-    buyToken: '',
-    totalSellAmount: '',
-    totalBuyAmountMin: '',
+    sellToken: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
+    buyToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
+    totalSellAmount: '1000000000000000000', // 1 WETH in wei
+    totalBuyAmountMin: '2000000000', // 2000 USDC (assuming 1 ETH = $2000)
     numParts: 10,
     partDurationSeconds: 3600,
   });
@@ -248,53 +216,6 @@ const SmartAutomations = () => {
     }
   }, [selectedChain]);
 
-  // Once a workflow is staged for consent, look up the decimals of whatever
-  // token its approve node would spend, so the amount input in the modal can
-  // work in human units instead of raw base units.
-  useEffect(() => {
-    if (!pendingType || !account?.address) return;
-    const tokenAddress = AUTOMATIONS[pendingType].approveToken?.(
-      pendingType === 'stop-loss' ? stopLossForm : pendingType === 'twap' ? twapForm : undefined
-    );
-    if (!tokenAddress) {
-      setApproveDecimals(null);
-      return;
-    }
-    let cancelled = false;
-    wallet
-      .getErc20DecimalsAndBalance({
-        address: account.address,
-        tokenAddress,
-        chainId: 1,
-      })
-      .then((res) => {
-        if (!cancelled) setApproveDecimals(res.decimals);
-      })
-      .catch(() => {
-        // If decimals can't be read (bad address, RPC error), fall back to
-        // requiring the unlimited checkbox rather than guessing a decimals
-        // value — guessing here could silently under- or over-scope by
-        // orders of magnitude.
-        if (!cancelled) setApproveDecimals(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [pendingType, account?.address, wallet, stopLossForm, twapForm]);
-
-  useEffect(() => {
-    if (!approveAmountInput || unlimitedApproval) {
-      setApproveAmountError(null);
-      return;
-    }
-    const n = Number(approveAmountInput);
-    if (!Number.isFinite(n) || n <= 0) {
-      setApproveAmountError('Enter a positive amount');
-    } else {
-      setApproveAmountError(null);
-    }
-  }, [approveAmountInput, unlimitedApproval]);
-
   const handlePrepareAutomation = useCallback(
     async (type: AutomationType, stopLossParams?: StopLossParams, twapParams?: TwapParams) => {
       if (!account?.address) return;
@@ -306,8 +227,6 @@ const SmartAutomations = () => {
         );
         setPendingType(type);
         setPendingWorkflow(built);
-        setApproveAmountInput('');
-        setUnlimitedApproval(false);
         setShowConsent(true);
       } catch (e) {
         message.error((e as Error).message);
@@ -363,68 +282,58 @@ const SmartAutomations = () => {
   const handleConfirmCreate = useCallback(async () => {
     if (!account?.address || !pendingWorkflow || !pendingType) return;
 
-    const approveToken = AUTOMATIONS[pendingType].approveToken?.(
-      pendingType === 'stop-loss' ? stopLossForm : pendingType === 'twap' ? twapForm : undefined
-    );
-
-    let nodesToSubmit = pendingWorkflow.nodes;
-    if (approveToken) {
-      if (!unlimitedApproval) {
-        if (approveDecimals === null) {
-          message.error(
-            "Couldn't verify this token's decimals — check the address or use unlimited approval."
-          );
-          return;
-        }
-        if (!approveAmountInput || approveAmountError) {
-          message.error('Enter a valid approval amount, or allow unlimited approval.');
-          return;
-        }
-      }
-      const rawAmount = unlimitedApproval
-        ? MAX_UINT256
-        : parseUnits(approveAmountInput, approveDecimals!).toString();
-      nodesToSubmit = scopeApproveNodeAmounts(pendingWorkflow.nodes, rawAmount);
-    }
-
-    // If the user has configured a Safe + Zodiac Roles Modifier, route
-    // execution through the role instead of executing directly — see
-    // DelegationSettings.tsx / delegation/zodiacRoles.ts. This runs after
-    // scopeApproveNodeAmounts so the role wraps the already-capped amount.
-    const roleDelegation = await wallet.getRoleDelegation(account.address);
-    if (roleDelegation) {
-      nodesToSubmit = applyRoleDelegation(nodesToSubmit as any, roleDelegation) as any;
-    }
-
-    setLoading(true);
     try {
-      await wallet.createKeeperhubWorkflow({
-        address: account.address,
-        chainId: selectedChain?.chainId ?? 1,
-        type: pendingType,
-        name: `${AUTOMATIONS[pendingType].label} - ${account.address.slice(
-          0,
-          6
-        )}`,
-        nodes: nodesToSubmit,
-        edges: pendingWorkflow.edges,
-      });
-      message.success('Automation created');
-      setShowConsent(false);
-      setPendingType(null);
-      setPendingWorkflow(null);
-      await load();
-    } catch (e) {
-      const errorMessage = (e as Error).message;
-      if (errorMessage.includes('API key')) {
-        message.error(
-          'KeeperHub API key is not configured. Please check your settings.'
-        );
-      } else {
-        message.error(errorMessage);
+      let nodesToSubmit = pendingWorkflow.nodes;
+      // Approval amount handling removed - AI generation handles proper action types
+      // The KeeperHub AI generates workflows with correct protocol-specific action types
+
+      // If the user has configured a Safe + Zodiac Roles Modifier, route
+      // execution through the role instead of executing directly — see
+      // DelegationSettings.tsx / delegation/zodiacRoles.ts. This runs after
+      // scopeApproveNodeAmounts so the role wraps the already-capped amount.
+      try {
+        const roleDelegation = await wallet.getRoleDelegation(account.address);
+        if (roleDelegation) {
+          nodesToSubmit = applyRoleDelegation(nodesToSubmit as any, roleDelegation) as any;
+        }
+      } catch (delegationError) {
+        console.error('Failed to get role delegation:', delegationError);
+        // Continue without role delegation if it fails
       }
-    } finally {
-      setLoading(false);
+
+      setLoading(true);
+      try {
+        await wallet.createKeeperhubWorkflow({
+          address: account.address,
+          chainId: selectedChain?.chainId ?? 1,
+          type: pendingType,
+          name: `${AUTOMATIONS[pendingType].label} - ${account.address.slice(
+            0,
+            6
+          )}`,
+          nodes: nodesToSubmit,
+          edges: pendingWorkflow.edges,
+        });
+        message.success('Automation created');
+        setShowConsent(false);
+        setPendingType(null);
+        setPendingWorkflow(null);
+        await load();
+      } catch (e) {
+        const errorMessage = (e as Error).message;
+        if (errorMessage.includes('API key')) {
+          message.error(
+            'KeeperHub API key is not configured. Please check your settings.'
+          );
+        } else {
+          message.error(errorMessage);
+        }
+      } finally {
+        setLoading(false);
+      }
+    } catch (error) {
+      console.error('Error in handleConfirmCreate:', error);
+      message.error('Failed to create automation. Please try again.');
     }
   }, [
     account?.address,
@@ -434,10 +343,7 @@ const SmartAutomations = () => {
     load,
     stopLossForm,
     twapForm,
-    unlimitedApproval,
-    approveDecimals,
-    approveAmountInput,
-    approveAmountError,
+    selectedChain,
   ]);
 
   const handleCancelConsent = useCallback(() => {
@@ -709,16 +615,12 @@ const SmartAutomations = () => {
           visible={showConsent}
           workflowType={AUTOMATIONS[pendingType].label}
           summary={AUTOMATIONS[pendingType].summary(
-            pendingType === 'stop-loss' ? stopLossForm : pendingType === 'twap' ? twapForm : undefined
+            pendingType === 'stop-loss' ? stopLossForm : pendingType === 'twap' ? twapForm : undefined,
+            pendingType === 'stop-loss' ? undefined : pendingType === 'twap' ? twapForm : undefined
           )}
           onConfirm={handleConfirmCreate}
           onCancel={handleCancelConsent}
           loading={loading}
-          amount={approveAmountInput}
-          onAmountChange={setApproveAmountInput}
-          unlimited={unlimitedApproval}
-          onUnlimitedChange={setUnlimitedApproval}
-          amountError={approveAmountError}
         />
       )}
     </div>

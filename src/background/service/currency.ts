@@ -90,7 +90,7 @@ class CurrencyService {
       });
       return currencyList;
     } catch (error) {
-      console.error('fetch currency list error: ', error);
+      console.error('fetch currency list error: ', error instanceof Error ? error.message : String(error));
       return currentStore.currencyList;
     }
   };

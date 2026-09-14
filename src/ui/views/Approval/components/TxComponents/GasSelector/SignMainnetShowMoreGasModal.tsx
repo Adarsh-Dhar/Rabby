@@ -441,7 +441,7 @@ export const SignMainnetShowMoreGasModal = ({
       </Dropdown>
       <Popup
         isNew
-        visible={tempoGasTokenVisible}
+        open={tempoGasTokenVisible}
         title={t('page.gasAccount.gasToken')}
         onCancel={() => setTempoGasTokenVisible(false)}
         destroyOnClose

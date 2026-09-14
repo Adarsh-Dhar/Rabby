@@ -709,7 +709,7 @@ const MiniSignTxV2 = ({ isDesktop }: { isDesktop?: boolean }) => {
         ) : null}
         <Popup
           height={'fit-content'}
-          visible={errorPopupVisible}
+          open={errorPopupVisible}
           bodyStyle={{ padding: 0 }}
           getContainer={desktopMiniSignerGetContainer}
         >
@@ -990,7 +990,7 @@ const MiniSignTxV2 = ({ isDesktop }: { isDesktop?: boolean }) => {
       ) : null}
       <Popup
         height={'fit-content'}
-        visible={errorPopupVisible}
+        open={errorPopupVisible}
         bodyStyle={{ padding: 0 }}
         getContainer={config?.getContainer}
         push={false}
@@ -1014,7 +1014,7 @@ const MiniSignTxV2 = ({ isDesktop }: { isDesktop?: boolean }) => {
         placement="bottom"
         height="fit-content"
         className="is-support-darkmode"
-        visible={visible && !errorPopupVisible}
+        open={visible && !errorPopupVisible}
         onClose={handleCancel}
         maskClosable={!loading}
         closable={false}

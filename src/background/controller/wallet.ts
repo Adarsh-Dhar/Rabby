@@ -7019,7 +7019,7 @@ export class WalletController extends BaseController {
   createKeeperhubWorkflow = async (params: {
     address: string;
     chainId: number;
-    type: 'liquidation-shield' | 'yield-harvester' | 'stop-loss';
+    type: 'liquidation-shield' | 'yield-harvester' | 'stop-loss' | 'twap';
     name: string;
     nodes: unknown[];
     edges: unknown[];

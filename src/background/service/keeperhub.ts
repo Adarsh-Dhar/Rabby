@@ -3,7 +3,8 @@ import { createPersistStore } from 'background/utils';
 export type KeeperhubWorkflowType =
   | 'liquidation-shield'
   | 'yield-harvester'
-  | 'stop-loss';
+  | 'stop-loss'
+  | 'twap';
 
 export interface KeeperhubWorkflowRecord {
   workflowId: string;

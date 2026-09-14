@@ -60,7 +60,7 @@ export const AddressDeleteModal = ({
   }, [type, brandName]);
 
   return (
-    <Popup visible={visible} title={null} height={220} onClose={onClose}>
+    <Popup open={visible} title={null} height={220} onClose={onClose}>
       <div className="flex items-center relative w-[48px] h-[48px] mx-auto">
         <ThemeIcon src={addressTypeIcon} className="w-[48px] h-[48px]" />
         <IconDelete className="absolute -bottom-4 -right-4" />

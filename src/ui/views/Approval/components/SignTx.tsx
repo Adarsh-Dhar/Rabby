@@ -2923,7 +2923,7 @@ const SignTx = ({
             placement="bottom"
             height="400px"
             className="gnosis-drawer custom-popup is-support-darkmode"
-            visible={drawerVisible}
+            open={drawerVisible}
             onClose={() => setDrawerVisible(false)}
             maskClosable
           >
@@ -2940,7 +2940,7 @@ const SignTx = ({
             placement="bottom"
             height="fit-content"
             className="gnosis-footer-bar is-support-darkmode"
-            visible={gnosisFooterBarVisible}
+            open={gnosisFooterBarVisible}
             onClose={() => setGnosisFooterBarVisible(false)}
             maskClosable
             closable={false}
@@ -2983,7 +2983,7 @@ const SignTx = ({
             placement="bottom"
             height="260px"
             className="gnosis-drawer is-support-darkmode"
-            visible={drawerVisible}
+            open={drawerVisible}
             onClose={() => setDrawerVisible(false)}
             maskClosable
           >

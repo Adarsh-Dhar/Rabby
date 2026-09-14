@@ -64,7 +64,7 @@ class KeeperhubMCPService {
   private baseUrl: string;
 
   constructor() {
-    this.baseUrl = 'https://app.keeperhub.com/api';
+    this.baseUrl = 'https://app.keeperhub.com';
   }
 
   init = async () => {
@@ -107,7 +107,7 @@ class KeeperhubMCPService {
 
     try {
       // Single canonical endpoint for AI workflow generation
-      const endpoint = `${this.baseUrl}/workflows/ai-generate`;
+      const endpoint = `${this.baseUrl}/api/workflows/ai-generate`;
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -201,7 +201,7 @@ class KeeperhubMCPService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/workflows`, {
+      const response = await fetch(`${this.baseUrl}/api/workflows/create`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -273,7 +273,7 @@ class KeeperhubMCPService {
 
     try {
       const response = await fetch(
-        `${this.baseUrl}/workflows/${workflowId}/execute`,
+        `${this.baseUrl}/api/workflows/${workflowId}/execute`,
         {
           method: 'POST',
           headers: {
@@ -345,7 +345,7 @@ class KeeperhubMCPService {
 
     try {
       const response = await fetch(
-        `${this.baseUrl}/executions/${executionId}`,
+        `${this.baseUrl}/api/executions/${executionId}`,
         {
           method: 'GET',
           headers: {
@@ -415,7 +415,7 @@ class KeeperhubMCPService {
     }
 
     try {
-      const url = new URL(`${this.baseUrl}/workflows`);
+      const url = new URL(`${this.baseUrl}/api/workflows`);
       if (params?.projectId)
         url.searchParams.append('projectId', params.projectId);
       if (params?.tagId) url.searchParams.append('tagId', params.tagId);
@@ -497,7 +497,7 @@ class KeeperhubMCPService {
     }
 
     try {
-      const response = await fetch(`${this.baseUrl}/workflows/validate`, {
+      const response = await fetch(`${this.baseUrl}/api/workflows/validate`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiKey}`,

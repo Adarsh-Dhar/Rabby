@@ -63285,8 +63285,8 @@
       "node_modules/es-toolkit/dist/predicate/isEqual.mjs",
       "node_modules/events/events.js",
       "node_modules/process/browser.js",
-      "node_modules/uint8arrays/esm/src/from-string.js",
-      "node_modules/uint8arrays/esm/src/index.js"
+      "node_modules/uint8arrays/dist/src/from-string.js",
+      "node_modules/uint8arrays/dist/src/index.js"
     ]
   },
   "node_modules/@walletconnect/crypto/dist/esm/browser/aes.js": {
@@ -63619,7 +63619,7 @@
       "node_modules/@walletconnect/window-getters/dist/cjs/index.js",
       "node_modules/blakejs/index.js",
       "node_modules/process/browser.js",
-      "node_modules/uint8arrays/esm/src/index.js"
+      "node_modules/uint8arrays/dist/src/index.js"
     ]
   },
   "node_modules/@walletconnect/utils/node_modules/@walletconnect/window-metadata/dist/cjs/index.js": {
@@ -87899,63 +87899,63 @@
       "navigator": "r"
     }
   },
-  "node_modules/uint8arrays/esm/src/alloc.js": {
+  "node_modules/uint8arrays/dist/src/alloc.js": {
     "enable": true,
     "global": {
       "Buffer": "r"
     },
     "require": [
-      "node_modules/uint8arrays/esm/src/util/as-uint8array.js"
+      "node_modules/uint8arrays/dist/src/util/as-uint8array.js"
     ]
   },
-  "node_modules/uint8arrays/esm/src/concat.js": {
+  "node_modules/uint8arrays/dist/src/concat.js": {
     "enable": true,
     "require": [
-      "node_modules/uint8arrays/esm/src/alloc.js",
-      "node_modules/uint8arrays/esm/src/util/as-uint8array.js"
+      "node_modules/uint8arrays/dist/src/alloc.js",
+      "node_modules/uint8arrays/dist/src/util/as-uint8array.js"
     ]
   },
-  "node_modules/uint8arrays/esm/src/from-string.js": {
-    "enable": true,
-    "global": {
-      "Buffer": "r"
-    },
-    "require": [
-      "node_modules/uint8arrays/esm/src/util/as-uint8array.js",
-      "node_modules/uint8arrays/esm/src/util/bases.js"
-    ]
-  },
-  "node_modules/uint8arrays/esm/src/index.js": {
-    "enable": true,
-    "require": [
-      "node_modules/uint8arrays/esm/src/concat.js",
-      "node_modules/uint8arrays/esm/src/from-string.js",
-      "node_modules/uint8arrays/esm/src/to-string.js"
-    ]
-  },
-  "node_modules/uint8arrays/esm/src/to-string.js": {
+  "node_modules/uint8arrays/dist/src/from-string.js": {
     "enable": true,
     "global": {
       "Buffer": "r"
     },
     "require": [
-      "node_modules/uint8arrays/esm/src/util/bases.js"
+      "node_modules/uint8arrays/dist/src/util/as-uint8array.js",
+      "node_modules/uint8arrays/dist/src/util/bases.js"
     ]
   },
-  "node_modules/uint8arrays/esm/src/util/as-uint8array.js": {
+  "node_modules/uint8arrays/dist/src/index.js": {
+    "enable": true,
+    "require": [
+      "node_modules/uint8arrays/dist/src/concat.js",
+      "node_modules/uint8arrays/dist/src/from-string.js",
+      "node_modules/uint8arrays/dist/src/to-string.js"
+    ]
+  },
+  "node_modules/uint8arrays/dist/src/to-string.js": {
+    "enable": true,
+    "global": {
+      "Buffer": "r"
+    },
+    "require": [
+      "node_modules/uint8arrays/dist/src/util/bases.js"
+    ]
+  },
+  "node_modules/uint8arrays/dist/src/util/as-uint8array.js": {
     "enable": true,
     "global": {
       "Buffer": "r"
     }
   },
-  "node_modules/uint8arrays/esm/src/util/bases.js": {
+  "node_modules/uint8arrays/dist/src/util/bases.js": {
     "enable": true,
     "global": {
       "TextDecoder": "r",
       "TextEncoder": "r"
     },
     "require": [
-      "node_modules/uint8arrays/esm/src/alloc.js",
+      "node_modules/uint8arrays/dist/src/alloc.js",
       "node_modules/uint8arrays/node_modules/multiformats/esm/src/basics.js"
     ]
   },
