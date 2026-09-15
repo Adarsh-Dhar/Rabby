@@ -72,11 +72,11 @@ class KeeperhubMCPService {
     // No separate init needed as we share the API key
   };
 
-  setApiKey = (key: string) => {
-    keeperhubService.setApiKey(key);
+  setApiKey = async (key: string) => {
+    await keeperhubService.setApiKey(key);
   };
 
-  getApiKey = () => keeperhubService.getApiKey();
+  getApiKey = async () => await keeperhubService.getApiKey();
 
   /**
    * Validate the API key format and availability
@@ -92,7 +92,7 @@ class KeeperhubMCPService {
   async generateWorkflow(
     request: MCPGenerateWorkflowRequest
   ): Promise<MCPWorkflowResponse> {
-    const apiKey = this.getApiKey();
+    const apiKey = await this.getApiKey();
     if (!apiKey) {
       throw new Error('KeeperHub API key is not configured');
     }
@@ -175,7 +175,7 @@ class KeeperhubMCPService {
     projectId?: string;
     tagId?: string;
   }): Promise<MCPWorkflowResponse> {
-    const apiKey = this.getApiKey();
+    const apiKey = await this.getApiKey();
     if (!apiKey) {
       throw new Error('KeeperHub API key is not configured');
     }
@@ -262,7 +262,7 @@ class KeeperhubMCPService {
    * This corresponds to the execute_workflow MCP tool
    */
   async executeWorkflow(workflowId: string): Promise<{ executionId: string }> {
-    const apiKey = this.getApiKey();
+    const apiKey = await this.getApiKey();
     if (!apiKey) {
       throw new Error('KeeperHub API key is not configured');
     }
@@ -334,7 +334,7 @@ class KeeperhubMCPService {
    * This corresponds to the get_execution MCP tool
    */
   async getExecution(executionId: string): Promise<MCPExecution> {
-    const apiKey = this.getApiKey();
+    const apiKey = await this.getApiKey();
     if (!apiKey) {
       throw new Error('KeeperHub API key is not configured');
     }
@@ -398,6 +398,80 @@ class KeeperhubMCPService {
   }
 
   /**
+   * List executions for a workflow
+   * NOTE: The endpoint path (GET /api/workflows/{id}/executions) is inferred from the existing pattern
+   * and has not been verified against KeeperHub's actual API documentation. This should be confirmed
+   * before shipping to production.
+   */
+  async listExecutions(workflowId: string): Promise<MCPExecution[]> {
+    const apiKey = await this.getApiKey();
+    if (!apiKey) {
+      throw new Error('KeeperHub API key is not configured');
+    }
+
+    if (!workflowId || workflowId.trim().length === 0) {
+      throw new Error('Workflow ID is required');
+    }
+
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/api/workflows/${workflowId}/executions`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          credentials: 'omit',
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Failed to list executions: ${response.status}`;
+
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage += ` - ${errorJson.message || errorText}`;
+        } catch {
+          errorMessage += ` - ${errorText}`;
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+
+      if (!Array.isArray(result)) {
+        throw new Error('Invalid executions response: expected an array');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('KeeperHub MCP list executions error:', error);
+
+      if (error instanceof Error) {
+        if (
+          error.message.includes('API key') ||
+          error.message.includes('Workflow ID')
+        ) {
+          throw error;
+        }
+        if (
+          error.message.includes('fetch') ||
+          error.message.includes('network')
+        ) {
+          throw new Error(
+            'Network error connecting to KeeperHub. Please check your connection.'
+          );
+        }
+      }
+
+      throw new Error('Failed to list executions. Please try again later.');
+    }
+  }
+
+  /**
    * List workflows for the organization
    * This corresponds to the list_workflows MCP tool
    */
@@ -405,7 +479,7 @@ class KeeperhubMCPService {
     projectId?: string;
     tagId?: string;
   }): Promise<MCPWorkflowResponse[]> {
-    const apiKey = this.getApiKey();
+    const apiKey = await this.getApiKey();
     if (!apiKey) {
       throw new Error('KeeperHub API key is not configured');
     }
@@ -479,7 +553,7 @@ class KeeperhubMCPService {
     nodes: MCPWorkflowNode[];
     edges: MCPWorkflowEdge[];
   }): Promise<{ valid: boolean; errors?: string[] }> {
-    const apiKey = this.getApiKey();
+    const apiKey = await this.getApiKey();
     if (!apiKey) {
       throw new Error('KeeperHub API key is not configured');
     }

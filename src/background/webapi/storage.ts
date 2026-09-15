@@ -5,15 +5,13 @@ let cacheMap: Map<string, any>;
 const get = async <T = any>(
   prop?: string
 ): Promise<typeof prop extends void ? any : T> => {
-  if (cacheMap) {
-    // @ts-expect-error we know if prop is void, it will return the whole cacheMap
-    return cacheMap.get(prop);
+  if (!cacheMap) {
+    const result = await browser.storage.local.get(null);
+    cacheMap = new Map(Object.entries(result ?? {}).map(([k, v]) => [k, v]));
   }
 
-  const result = await browser.storage.local.get(null);
-  cacheMap = new Map(Object.entries(result ?? {}).map(([k, v]) => [k, v]));
-
-  return prop ? result?.[prop] : result;
+  // @ts-expect-error we know if prop is void, it will return the whole cacheMap
+  return cacheMap.get(prop);
 };
 
 const set = async (prop: string, value: any): Promise<void> => {
@@ -33,8 +31,13 @@ const byteInUse = async (): Promise<number> => {
   });
 };
 
+const clearCache = () => {
+  cacheMap = undefined as any;
+};
+
 export default {
   get,
   set,
   byteInUse,
+  clearCache,
 };

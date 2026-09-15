@@ -6981,11 +6981,11 @@ export class WalletController extends BaseController {
   // The kh_* API key is entered once by the user and held only in the
   // background persisted store (src/background/service/keeperhub.ts).
   // It is never exposed to dapp-facing contexts.
-  setKeeperhubApiKey = (key: string) => {
-    keeperhubService.setApiKey(key);
+  setKeeperhubApiKey = async (key: string) => {
+    await keeperhubService.setApiKey(key);
   };
-  getKeeperhubApiKeyStatus = () => Boolean(keeperhubService.getApiKey());
-  clearKeeperhubApiKey = () => keeperhubService.clearApiKey();
+  getKeeperhubApiKeyStatus = async () => Boolean(await keeperhubService.getApiKey());
+  clearKeeperhubApiKey = async () => await keeperhubService.clearApiKey();
 
   // Optional Safe + Zodiac Roles Modifier delegation config. See
   // src/background/service/roleDelegation.ts and
@@ -7007,9 +7007,26 @@ export class WalletController extends BaseController {
     address: string,
     workflowId: string
   ) => {
-    // Placeholder for future implementation
-    // This would call KeeperHub API to fetch execution history
-    return [];
+    try {
+      const executions = await keeperhubMCPService.listExecutions(workflowId);
+
+      // Map MCPExecution[] to the shape ExecutionHistory.tsx expects
+      return executions.map((exec) => ({
+        id: exec.id,
+        workflowId: exec.workflowId,
+        status: (exec.status === 'pending' ? 'running' :
+                 exec.status === 'running' ? 'running' :
+                 exec.status === 'completed' ? 'success' :
+                 exec.status === 'failed' ? 'error' : 'error') as 'success' | 'error' | 'running',
+        timestamp: new Date(exec.startedAt).getTime(),
+        completedAt: exec.completedAt ? new Date(exec.completedAt).getTime() : undefined,
+        logs: exec.logs || [],
+        transactionHashes: exec.transactionHashes || {},
+      }));
+    } catch (error) {
+      console.error('Failed to fetch workflow executions:', error);
+      return [];
+    }
   };
 
   // Calls POST https://app.keeperhub.com/api/workflows, then persists the

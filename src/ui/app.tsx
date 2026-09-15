@@ -177,18 +177,25 @@ const checkSwAlive = () => {
       console.log('[checkSwAlive] sw is alive');
     })
     .catch((e) => {
+      // Check and clear runtime.lastError to prevent unhandled error warnings
+      const lastError = browser.runtime.lastError;
+      if (lastError) {
+        // Clear the error to prevent the "Unchecked runtime.lastError" warning
+        browser.runtime.lastError;
+      }
+
       if (e.message === 'timeout') {
         console.log('[checkSwAlive] sw is inactive', e);
         Sentry.captureException(
           'sw is inactive' +
-            (browser.runtime.lastError ? ':' + browser.runtime.lastError : '')
+            (lastError ? ':' + lastError : '')
         );
       } else {
         console.log('[checkSwAlive] sw is dead');
         Sentry.captureMessage(
           'sw is dead:' +
             e.message +
-            (browser.runtime.lastError ? ':' + browser.runtime.lastError : '')
+            (lastError ? ':' + lastError : '')
         );
       }
     });

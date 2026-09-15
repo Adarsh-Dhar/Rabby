@@ -130,13 +130,15 @@ export async function buildLiquidationShieldWorkflow(params: {
       edges: response.edges,
     };
   } catch (error) {
-    console.error('Failed to generate liquidation shield workflow:', error);
     // Provide more detailed error information
     if (error instanceof Error) {
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-      });
+      console.error('Failed to generate liquidation shield workflow:', error.message);
+      // Re-throw API key configuration errors so the UI can handle them appropriately
+      if (error.message.includes('API key')) {
+        throw error;
+      }
+    } else {
+      console.error('Failed to generate liquidation shield workflow:', error);
     }
 
     // Fallback: create a basic workflow structure manually
@@ -314,12 +316,14 @@ export async function buildYieldHarvesterWorkflow(params: {
       edges: response.edges,
     };
   } catch (error) {
-    console.error('Failed to generate yield harvester workflow:', error);
     if (error instanceof Error) {
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-      });
+      console.error('Failed to generate yield harvester workflow:', error.message);
+      // Re-throw API key configuration errors so the UI can handle them appropriately
+      if (error.message.includes('API key')) {
+        throw error;
+      }
+    } else {
+      console.error('Failed to generate yield harvester workflow:', error);
     }
 
     // Fallback: create a basic yield harvesting structure
@@ -478,12 +482,14 @@ export async function buildTwapWorkflow(params: {
       edges: response.edges,
     };
   } catch (error) {
-    console.error('Failed to generate TWAP workflow:', error);
     if (error instanceof Error) {
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-      });
+      console.error('Failed to generate TWAP workflow:', error.message);
+      // Re-throw API key configuration errors so the UI can handle them appropriately
+      if (error.message.includes('API key')) {
+        throw error;
+      }
+    } else {
+      console.error('Failed to generate TWAP workflow:', error);
     }
 
     // Fallback: create a basic TWAP structure using Uniswap swaps
@@ -613,12 +619,14 @@ export async function buildStopLossWorkflow(params: {
       edges: response.edges,
     };
   } catch (error) {
-    console.error('Failed to generate stop-loss workflow:', error);
     if (error instanceof Error) {
-      console.error('Error details:', {
-        message: error.message,
-        stack: error.stack,
-      });
+      console.error('Failed to generate stop-loss workflow:', error.message);
+      // Re-throw API key configuration errors so the UI can handle them appropriately
+      if (error.message.includes('API key')) {
+        throw error;
+      }
+    } else {
+      console.error('Failed to generate stop-loss workflow:', error);
     }
 
     // Fallback: create a basic stop-loss structure

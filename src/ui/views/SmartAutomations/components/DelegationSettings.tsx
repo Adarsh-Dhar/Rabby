@@ -23,6 +23,7 @@ export interface DelegationSettingsValue {
   safeAddress: string;
   rolesModifierAddress: string;
   roleKey: string;
+  chainId: number;
 }
 
 interface DelegationSettingsProps {
@@ -266,6 +267,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
         });
       }
       setRoleKey(pastedRoleKey.trim());
+      setSafeAddress(predictedSafeAddress);
       setGuidedSetupStep(4);
     } catch (e) {
       message.error(`Failed to apply role permissions: ${e.message}`);
@@ -459,6 +461,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
                     safeAddress: predictedSafeAddress,
                     rolesModifierAddress,
                     roleKey,
+                    chainId: chainId ?? 1,
                   });
                   setShowGuidedSetup(false);
                   setGuidedSetupStep(0);
@@ -523,6 +526,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
                     safeAddress: safeAddress.trim(),
                     rolesModifierAddress: rolesModifierAddress.trim(),
                     roleKey: roleKey.trim(),
+                    chainId: chainId ?? 1,
                   })
                 }
               >

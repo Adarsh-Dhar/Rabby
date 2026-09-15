@@ -68,8 +68,9 @@ export const CurveThumbnail = ({
   isHover,
   onHover,
   appChainIds,
-  showAppChainTips = false,
+  showAppChainTips,
 }: CurveThumbnailProps) => {
+  const resolvedShowAppChainTips = showAppChainTips ?? false;
   const color = useMemo(() => {
     return `var(--color-curve-${data?.isLoss ? 'red' : 'green'})`;
   }, [data]);
@@ -148,14 +149,14 @@ export const CurveThumbnail = ({
             if (val?.activePayload) {
               onHover?.(val.activePayload[0].payload);
             }
-            if (showAppChainTips) {
+            if (resolvedShowAppChainTips) {
               handleMouseMove(event);
             }
           }}
-          onMouseEnter={showAppChainTips ? handleMouseEnter : undefined}
+          onMouseEnter={resolvedShowAppChainTips ? handleMouseEnter : undefined}
           onMouseLeave={() => {
             onHover?.(undefined);
-            if (showAppChainTips) {
+            if (resolvedShowAppChainTips) {
               handleMouseLeave();
             }
           }}

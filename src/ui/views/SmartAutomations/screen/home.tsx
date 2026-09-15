@@ -4,6 +4,7 @@ import { PageHeader } from '@/ui/component';
 import { useWallet } from '@/ui/utils';
 import { useCurrentAccount } from '@/ui/hooks/backgroundState/useAccount';
 import { Button, Card, Input, InputNumber, message, Select } from 'antd';
+import { findChain } from '@/utils/chain';
 import {
   buildLiquidationShieldWorkflow,
   buildYieldHarvesterWorkflow,
@@ -13,14 +14,20 @@ import {
   MAX_UINT256,
   USDC_ADDRESS,
 } from '../workflowTemplates';
-import { listVerifiedChains, type ChainContracts } from '../chainRegistry';
+import { listVerifiedChains, type ChainContracts, chainToViemChain } from '../chainRegistry';
 import {
   WorkflowConsentModal,
   WorkflowConsentSummary,
 } from '../components/WorkflowConsentModal';
 import { ExecutionHistory } from '../components/ExecutionHistory';
+import { DelegationSettings, type DelegationSettingsValue } from '../components/DelegationSettings';
 import { useAaveHealthFactor } from '../hooks/useAaveHealthFactor';
 import { applyRoleDelegation } from '../delegation/zodiacRoles';
+import {
+  buildTwapCreateTransaction,
+  assertSafeReadyForComposableCow,
+  getComposableCowDeployment,
+} from '../delegation/cowTwap';
 import {
   useAaveForkPosition,
   useLidoPosition,
@@ -130,9 +137,11 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
     }),
   },
   'twap': {
-    label: 'Scheduled Swap (Uniswap v3) — not a real TWAP',
+    label: 'TWAP (CoW Protocol)',
     needsForm: true,
-    approveToken: (_stopLossParams, twapParams) => twapParams?.sellToken,
+    // Note: For real TWAP via ComposableCoW, approval is handled at the Safe level
+    // through role delegation, not via individual ERC20 approvals
+    approveToken: undefined,
     build: (address, _stopLossParams, twapParams) => {
       if (!twapParams) {
         throw new Error('TWAP requires sell token, buy token, amount, parts, and duration');
@@ -148,12 +157,8 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
       });
     },
     summary: (stopLossParams, twapParams) => ({
-      protocol: 'Uniswap V3',
-      action:
-        'Repeated one-shot swaps on a schedule — NOT a time-weighted-average-price ' +
-        'order. Real TWAP (via CoW Protocol ComposableCoW) requires a Safe with ' +
-        'Zodiac Roles delegation set up first; until then this button falls back ' +
-        'to plain scheduled Uniswap swaps.',
+      protocol: 'CoW Protocol',
+      action: 'Time-weighted average price order via ComposableCoW',
       triggerCondition: twapParams
         ? `${twapParams.numParts} parts over ${twapParams.partDurationSeconds}s each`
         : 'TWAP schedule',
@@ -174,6 +179,11 @@ const SmartAutomations = () => {
     null
   );
   const [selectedChain, setSelectedChain] = useState<ChainContracts | null>(null);
+
+  // Delegation settings state
+  const [showDelegationSettings, setShowDelegationSettings] = useState(false);
+  const [delegationLoading, setDelegationLoading] = useState(false);
+  const [roleDelegation, setRoleDelegation] = useState<DelegationSettingsValue | null>(null);
 
   // Consent modal state
   const [showConsent, setShowConsent] = useState(false);
@@ -227,12 +237,23 @@ const SmartAutomations = () => {
 
   const load = useCallback(async () => {
     if (!account?.address) return;
-    const [keyStatus, list] = await Promise.all([
+    const [keyStatus, list, delegation] = await Promise.all([
       wallet.getKeeperhubApiKeyStatus(),
       wallet.getKeeperhubWorkflows(account.address),
+      wallet.getRoleDelegation(account.address),
     ]);
     setHasApiKey(keyStatus);
     setWorkflows(list);
+    if (delegation) {
+      setRoleDelegation({
+        safeAddress: delegation.safeAddress,
+        rolesModifierAddress: delegation.rolesModifierAddress,
+        roleKey: delegation.roleKey,
+        chainId: delegation.chainId,
+      });
+    } else {
+      setRoleDelegation(null);
+    }
   }, [wallet, account?.address]);
 
   useEffect(() => {
@@ -324,7 +345,7 @@ const SmartAutomations = () => {
     handlePrepareAutomation('stop-loss', stopLossForm);
   }, [stopLossForm, handlePrepareAutomation]);
 
-  const handleConfirmTwapForm = useCallback(() => {
+  const handleConfirmTwapForm = useCallback(async () => {
     if (
       !twapForm.sellToken ||
       !twapForm.buyToken ||
@@ -336,9 +357,89 @@ const SmartAutomations = () => {
       message.error('Fill in sell token, buy token, amounts, parts, and duration');
       return;
     }
+
+    if (!account?.address || !selectedChain) {
+      message.error('No account or chain selected');
+      return;
+    }
+
+    // Check if user has a Safe configured for real TWAP
+    const roleDelegation = await wallet.getRoleDelegation(account.address);
+    if (roleDelegation && roleDelegation.chainId === selectedChain.chainId) {
+      try {
+        // Check if Safe is ready for ComposableCoW
+        const deployment = getComposableCowDeployment(roleDelegation.chainId);
+        const readyCheck = await assertSafeReadyForComposableCow(
+          roleDelegation.safeAddress,
+          deployment,
+          (address, slot) =>
+            wallet.requestETHRpc(
+              { method: 'eth_getStorageAt', params: [address, slot, 'latest'] },
+              selectedChain.serverId
+            )
+        );
+
+        if (readyCheck.ready) {
+          // Use real TWAP path - create transaction directly, not a KeeperHub workflow
+          try {
+            // Get RPC URL from chain config
+            const chainConfig = findChain({ serverId: selectedChain.serverId });
+            const rpcUrl = (chainConfig as any)?.rpcUrl || '';
+            const viemChain = chainToViemChain(selectedChain, rpcUrl);
+
+            const tx = buildTwapCreateTransaction(
+              {
+                sellToken: twapForm.sellToken,
+                buyToken: twapForm.buyToken,
+                receiver: roleDelegation.safeAddress,
+                totalSellAmount: twapForm.totalSellAmount,
+                totalBuyAmountMin: twapForm.totalBuyAmountMin,
+                numParts: twapForm.numParts,
+                partDurationSeconds: twapForm.partDurationSeconds,
+                appData: '0x0000000000000000000000000000000000000000000000000000000000000000', // Default appData (bytes32)
+              },
+              roleDelegation.chainId,
+              { rpcUrl, viemChain }
+            );
+
+            // Send the transaction via Rabby's confirmation flow
+            await wallet.sendRequest({
+              method: 'eth_sendTransaction',
+              params: [
+                {
+                  from: roleDelegation.safeAddress,
+                  to: tx.to,
+                  value: tx.value,
+                  data: tx.data,
+                },
+              ],
+            });
+
+            message.success('TWAP order created on CoW Protocol');
+            setShowTwapForm(false);
+            return;
+          } catch (e) {
+            message.error(`Failed to create TWAP order: ${(e as Error).message}`);
+            return;
+          }
+        } else {
+          // Safe exists but not configured for ComposableCoW - show warning and fall back
+          message.warning(
+            `Safe not configured for ComposableCoW: ${readyCheck.reason}. Using fallback scheduled swap instead.`
+          );
+        }
+      } catch (e) {
+        console.error('Error checking Safe for ComposableCoW:', e);
+        message.warning(
+          `Could not verify Safe configuration: ${(e as Error).message}. Using fallback scheduled swap instead.`
+        );
+      }
+    }
+
+    // Fallback to KeeperHub workflow path
     setShowTwapForm(false);
     handlePrepareAutomation('twap', undefined, twapForm);
-  }, [twapForm, handlePrepareAutomation]);
+  }, [twapForm, account, selectedChain, wallet, handlePrepareAutomation]);
 
   const handleConfirmCreate = useCallback(async () => {
     if (!account?.address || !pendingWorkflow || !pendingType) return;
@@ -471,6 +572,59 @@ const SmartAutomations = () => {
   return (
     <div className="p-20">
       <PageHeader>Smart Automations</PageHeader>
+
+      <Card size="small" className="mb-16" title="Execution mode">
+        <div className="flex justify-between items-center">
+          <span>
+            {roleDelegation
+              ? `Safe + Roles (configured: ${roleDelegation.safeAddress.slice(0, 8)}…)`
+              : 'Direct (EOA)'}
+          </span>
+          <Button size="small" onClick={() => setShowDelegationSettings(!showDelegationSettings)}>
+            {showDelegationSettings ? 'Hide' : 'Configure'}
+          </Button>
+        </div>
+        {showDelegationSettings && (
+          <div className="mt-16">
+            <DelegationSettings
+              value={roleDelegation}
+              onSave={async (value) => {
+                setDelegationLoading(true);
+                try {
+                  if (!account?.address) throw new Error('No account selected');
+                  await wallet.setRoleDelegation(account.address, value);
+                  setRoleDelegation(value);
+                  setShowDelegationSettings(false);
+                  message.success('Delegation settings saved');
+                } catch (e) {
+                  message.error(`Failed to save delegation: ${(e as Error).message}`);
+                } finally {
+                  setDelegationLoading(false);
+                }
+              }}
+              onClear={async () => {
+                setDelegationLoading(true);
+                try {
+                  if (!account?.address) throw new Error('No account selected');
+                  await wallet.clearRoleDelegation(account.address);
+                  setRoleDelegation(null);
+                  setShowDelegationSettings(false);
+                  message.success('Delegation cleared');
+                } catch (e) {
+                  message.error(`Failed to clear delegation: ${(e as Error).message}`);
+                } finally {
+                  setDelegationLoading(false);
+                }
+              }}
+              saving={delegationLoading}
+              wallet={wallet}
+              accountAddress={account?.address}
+              chainServerId={selectedChain?.serverId}
+              chainId={selectedChain?.chainId}
+            />
+          </div>
+        )}
+      </Card>
 
       <Card size="small" className="mb-16" title={`Discovery — ${selectedChain?.label || 'Select a chain'}`}>
         <div className="flex flex-col gap-8 text-13">

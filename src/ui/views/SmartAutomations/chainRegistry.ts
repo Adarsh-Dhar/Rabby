@@ -24,6 +24,8 @@ export interface ChainContracts {
   /** Numeric chainId as the string form KeeperHub's `network` field expects. */
   network: string;
   label: string;
+  /** Rabby's internal chain serverId (e.g. 'eth', 'base') for RPC calls */
+  serverId: string;
   aaveV3Pool?: string;
   sparkPool?: string;
   lidoStEth?: string;
@@ -39,6 +41,7 @@ export const CHAIN_REGISTRY: Record<SupportedChainKey, ChainContracts> = {
     chainId: 1,
     network: '1',
     label: 'Ethereum Mainnet',
+    serverId: 'eth',
     aaveV3Pool: '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2',
     sparkPool: '0xC13e21B648A5Ee794902342038FF3aDAB66BE987',
     lidoStEth: '0xae7ab96520DE3A18E5e111B5EaAb095312D7fE84',
@@ -52,6 +55,7 @@ export const CHAIN_REGISTRY: Record<SupportedChainKey, ChainContracts> = {
     chainId: 8453,
     network: '8453',
     label: 'Base',
+    serverId: 'base',
     aaveV3Pool: '0xA238Dd80c45528fE416F5A48935Ad7213c52e3d4', // VERIFY: cross-check against @bgd-labs/aave-address-book
     usdc: '0x833589fCD6eDb6E08f4c72532eF7C0Fa09EB7B44', // VERIFY: cross-check against Circle's official contract list
     uniswapV3Router: '0x3fC91A3afd70395Cd4963868e85F0694D1c7597B', // VERIFY: cross-check against Uniswap official docs
@@ -62,6 +66,7 @@ export const CHAIN_REGISTRY: Record<SupportedChainKey, ChainContracts> = {
     chainId: 42161,
     network: '42161',
     label: 'Arbitrum One',
+    serverId: 'arbitrum',
     aaveV3Pool: '0x794a61358D6845594F94dc1DB02A252b5b1651F9', // VERIFY: cross-check against @bgd-labs/aave-address-book
     usdc: '0xaf88d065e77c8cC2239327C5EDb3A432268e5831', // VERIFY: cross-check against Circle's official contract list
     uniswapV3Router: '0xE592427A0AEce92De3Edee1F18E0157C05861564', // VERIFY: confirm CREATE2 deployment on Arbitrum
@@ -91,4 +96,30 @@ export function getChainContracts(chain: SupportedChainKey): ChainContracts {
 
 export function listVerifiedChains(): ChainContracts[] {
   return Object.values(CHAIN_REGISTRY).filter((c) => c.verified);
+}
+
+/**
+ * Adapter to convert Rabby's chain data to viem's Chain shape for cowTwap.ts.
+ * This builds a minimal viem Chain object from what Rabby already has.
+ */
+export function chainToViemChain(chain: ChainContracts, rpcUrl: string): {
+  id: number;
+  name: string;
+  nativeCurrency: { name: string; symbol: string; decimals: number };
+  rpcUrls: { default: { http: string[] } };
+} {
+  return {
+    id: chain.chainId,
+    name: chain.label,
+    nativeCurrency: {
+      name: 'Ether',
+      symbol: 'ETH',
+      decimals: 18,
+    },
+    rpcUrls: {
+      default: {
+        http: [rpcUrl],
+      },
+    },
+  };
 }

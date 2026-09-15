@@ -93,6 +93,11 @@ const config = {
   module: {
     rules: [
       {
+        test: /\.mjs$/,
+        include: /node_modules/,
+        type: 'javascript/auto',
+      },
+      {
         test: /\.jsx?$|\.tsx?$/,
         exclude: /node_modules/,
         oneOf: [
@@ -389,6 +394,8 @@ const config = {
       moment: require.resolve('dayjs'),
       '@debank/common': require.resolve('@debank/common/dist/index-rabby'),
       'uint8arrays/esm': require.resolve('uint8arrays'),
+      'cross-fetch/polyfill': require.resolve('cross-fetch/dist/browser-ponyfill.js'),
+      'cross-fetch': require.resolve('cross-fetch/dist/browser-ponyfill.js'),
     },
     plugins: [new TSConfigPathsPlugin()],
     fallback: {
@@ -400,7 +407,7 @@ const config = {
       http: require.resolve('stream-http'),
       vm: false,
     },
-    extensions: ['.js', 'jsx', '.ts', '.tsx'],
+    extensions: ['.js', '.jsx', '.ts', '.tsx', '.mjs'],
   },
   stats: 'minimal',
   optimization: {

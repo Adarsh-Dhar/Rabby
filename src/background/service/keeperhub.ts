@@ -26,6 +26,8 @@ interface KeeperhubStore {
 class KeeperhubService {
   store!: KeeperhubStore;
   private apiKey: string;
+  private initialized: boolean = false;
+  private initPromise: Promise<void> | null = null;
 
   constructor() {
     // No default key. Until the user configures one in Settings, this stays
@@ -34,24 +36,43 @@ class KeeperhubService {
   }
 
   init = async () => {
-    this.store = await createPersistStore<KeeperhubStore>({
-      name: 'keeperhub',
-      template: {
-        workflowsByAddress: {},
-        apiKey: '',
-      },
-    });
-    this.apiKey = this.store.apiKey || '';
+    if (this.initialized) return;
+    if (this.initPromise) return this.initPromise;
+
+    this.initPromise = (async () => {
+      this.store = await createPersistStore<KeeperhubStore>({
+        name: 'keeperhub',
+        template: {
+          workflowsByAddress: {},
+          apiKey: '',
+        },
+      });
+      this.apiKey = this.store.apiKey || '';
+      this.initialized = true;
+    })();
+
+    await this.initPromise;
   };
 
-  setApiKey = (key: string) => {
+  private ensureInitialized = async () => {
+    if (!this.initialized) {
+      await this.init();
+    }
+  };
+
+  setApiKey = async (key: string) => {
+    await this.ensureInitialized();
     this.apiKey = key;
     this.store.apiKey = key;
   };
 
-  getApiKey = () => this.apiKey;
+  getApiKey = async () => {
+    await this.ensureInitialized();
+    return this.apiKey;
+  };
 
-  clearApiKey = () => {
+  clearApiKey = async () => {
+    await this.ensureInitialized();
     this.apiKey = '';
     this.store.apiKey = '';
   };

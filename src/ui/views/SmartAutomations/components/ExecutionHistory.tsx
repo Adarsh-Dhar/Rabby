@@ -10,7 +10,13 @@ interface ExecutionRecord {
   id: string;
   status: 'success' | 'error' | 'running';
   timestamp: number;
-  result?: any;
+  completedAt?: number;
+  logs?: Array<{
+    level: 'info' | 'error' | 'warn';
+    message: string;
+    timestamp: string;
+  }>;
+  transactionHashes?: Record<string, string>;
 }
 
 export const ExecutionHistory: React.FC<ExecutionHistoryProps> = ({
@@ -26,24 +32,21 @@ export const ExecutionHistory: React.FC<ExecutionHistoryProps> = ({
     const loadExecutions = async () => {
       setLoading(true);
       try {
-        // Check if the method exists before calling it
-        const walletWithExecutions = wallet as any;
-        if (typeof walletWithExecutions.getKeeperhubWorkflowExecutions !== 'function') {
-          setFeatureNotImplemented(true);
-          return;
-        }
-
-        // This would call a new wallet method to fetch execution history
-        // For now, this is a placeholder
-        const history = await walletWithExecutions.getKeeperhubWorkflowExecutions(
+        const history = await wallet.getKeeperhubWorkflowExecutions(
           address,
           workflowId
         );
         setExecutions(history);
+        setFeatureNotImplemented(false);
       } catch (error) {
         console.error('Failed to load execution history:', error);
-        // If the method doesn't exist yet, show a placeholder message
-        setFeatureNotImplemented(true);
+        // If it's an API key error, show the "not implemented" message
+        // Otherwise, treat it as an empty execution list (workflow may not have run yet)
+        if (error instanceof Error && error.message.includes('API key')) {
+          setFeatureNotImplemented(true);
+        } else {
+          setExecutions([]);
+        }
       } finally {
         setLoading(false);
       }
@@ -59,7 +62,7 @@ export const ExecutionHistory: React.FC<ExecutionHistoryProps> = ({
   if (featureNotImplemented) {
     return (
       <div className="text-r-neutral-foot text-12">
-        Execution history not yet available
+        Execution history requires KeeperHub API key configuration
       </div>
     );
   }
@@ -74,21 +77,56 @@ export const ExecutionHistory: React.FC<ExecutionHistoryProps> = ({
     <div className="mt-8">
       <div className="text-r-neutral-foot text-12 mb-4">Execution History</div>
       {executions.map((exec) => (
-        <div key={exec.id} className="flex justify-between py-4 text-12">
-          <span className="text-r-neutral-title">
-            {new Date(exec.timestamp).toLocaleString()}
-          </span>
-          <span
-            className={
-              exec.status === 'success'
-                ? 'text-green-500'
-                : exec.status === 'error'
-                ? 'text-red-500'
-                : 'text-yellow-500'
-            }
-          >
-            {exec.status}
-          </span>
+        <div key={exec.id} className="border-b py-4">
+          <div className="flex justify-between text-12 mb-2">
+            <span className="text-r-neutral-title">
+              {new Date(exec.timestamp).toLocaleString()}
+            </span>
+            <span
+              className={
+                exec.status === 'success'
+                  ? 'text-green-500'
+                  : exec.status === 'error'
+                  ? 'text-red-500'
+                  : 'text-yellow-500'
+              }
+            >
+              {exec.status}
+            </span>
+          </div>
+          {exec.completedAt && (
+            <div className="text-r-neutral-foot text-12">
+              Completed: {new Date(exec.completedAt).toLocaleString()}
+            </div>
+          )}
+          {exec.logs && exec.logs.length > 0 && (
+            <div className="mt-2">
+              <div className="text-r-neutral-foot text-12 mb-1">Logs:</div>
+              {exec.logs.slice(0, 3).map((log, idx) => (
+                <div key={idx} className="text-12" style={{ marginLeft: '8px' }}>
+                  <span className={log.level === 'error' ? 'text-red-500' : 'text-r-neutral-body'}>
+                    [{log.level}] {log.message}
+                  </span>
+                </div>
+              ))}
+              {exec.logs.length > 3 && (
+                <div className="text-r-neutral-foot text-12" style={{ marginLeft: '8px' }}>
+                  +{exec.logs.length - 3} more logs
+                </div>
+              )}
+            </div>
+          )}
+          {exec.transactionHashes && Object.keys(exec.transactionHashes).length > 0 && (
+            <div className="mt-2">
+              <div className="text-r-neutral-foot text-12 mb-1">Transactions:</div>
+              {Object.entries(exec.transactionHashes).map(([key, hash]) => (
+                <div key={key} className="text-12" style={{ marginLeft: '8px' }}>
+                  <span className="text-r-neutral-body">{key}: </span>
+                  <span className="text-r-blue-light">{hash.slice(0, 10)}…{hash.slice(-6)}</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       ))}
     </div>

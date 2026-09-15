@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import ReactDOM from 'react-dom';
 import { Tooltip } from 'antd';
 import { TooltipProps } from 'antd/lib/tooltip';
 
@@ -53,6 +52,15 @@ export const ScrollAwareTooltip: React.FC<
   const domRef = useRef<HTMLElement | null>(null);
   const scrollParentsRef = useRef<(HTMLElement | Window)[]>([]);
   const [isAnchorInView, setIsAnchorInView] = useState(true);
+  const childrenRef = useRef<HTMLElement | null>(null);
+
+  // Callback ref to capture the children element
+  const setChildrenRef = useCallback((node: any) => {
+    childrenRef.current = node;
+    if (node) {
+      domRef.current = node;
+    }
+  }, []);
 
   const checkVisibility = useCallback(() => {
     const dom = domRef.current;
@@ -76,11 +84,10 @@ export const ScrollAwareTooltip: React.FC<
   }, [checkVisibility]);
 
   useEffect(() => {
-    // eslint-disable-next-line react/no-find-dom-node
-    const dom = ReactDOM.findDOMNode(tooltipRef.current) as HTMLElement | null;
+    // Use callback ref pattern to avoid findDOMNode deprecation
+    const dom = domRef.current;
     if (!dom) return;
 
-    domRef.current = dom;
     const scrollParents = getScrollParents(dom);
     scrollParentsRef.current = scrollParents;
 
@@ -128,7 +135,7 @@ export const ScrollAwareTooltip: React.FC<
 
   return (
     <Tooltip {...restProps} visible={finalVisible} ref={tooltipRef}>
-      {children}
+      <span ref={setChildrenRef}>{children}</span>
     </Tooltip>
   );
 };
