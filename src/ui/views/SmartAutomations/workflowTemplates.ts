@@ -8,8 +8,82 @@ import type {
 const AAVE_V3_POOL_ADDRESS = '0x87870Bca3F3fD6335C3F4ce8392D69350B4fA4E2';
 const UNISWAP_V3_ROUTER_ADDRESS = '0xE592427A0AEce92De3Edee1F18E0157C05861564';
 export const USDC_ADDRESS = '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48';
-const MAX_UINT256 =
+export const MAX_UINT256 =
   '115792089237316195423570985008687907853269984665640564039457584007913129639935';
+
+/**
+ * Rewrites the amount argument of any `web3/write-contract` node whose
+ * functionName is `approve`, so the fallback templates' hardcoded
+ * MAX_UINT256 never reaches submission unscoped. This runs as a
+ * post-processing pass over whatever node list the caller ends up with —
+ * whether that's the hand-built fallback above, or (best-effort) a node
+ * list KeeperHub's AI generation returned — because patching only the
+ * builder functions above wouldn't cover the AI path.
+ *
+ * IMPORTANT LIMITATION: this only knows how to rewrite the specific shape
+ * these fallback templates emit — `config.functionName === 'approve'` with
+ * `config.functionArgs` as a JSON-stringified `[spender, amount]` tuple. If
+ * KeeperHub's AI path returns approve calls in a different shape (a
+ * different actionType, non-JSON args, a different arg order), this will
+ * NOT catch it — it logs a warning rather than silently claiming coverage
+ * it doesn't have. Treat any such warning as a real gap to close, not noise.
+ *
+ * @param nodes - The workflow's node list (from either builder path)
+ * @param rawAmount - The raw base-unit amount string to cap approvals at.
+ *   Pass MAX_UINT256 explicitly if the user opted into unlimited approval
+ *   (via the "allow unlimited" checkbox) — this function does not decide
+ *   that policy, it just applies whatever amount the caller resolved.
+ */
+export function scopeApproveNodeAmounts<T extends { data: { config?: Record<string, any> } }>(
+  nodes: T[],
+  rawAmount: string
+): T[] {
+  return nodes.map((node) => {
+    const config = node.data?.config;
+    if (!config || config.functionName !== 'approve') {
+      return node;
+    }
+    if (config.actionType !== 'web3/write-contract' || typeof config.functionArgs !== 'string') {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `scopeApproveNodeAmounts: found an approve() node with an unexpected shape ` +
+          `(actionType=${config.actionType}) — leaving it unscoped. This node will ` +
+          `execute with whatever amount it already has, uncapped.`
+      );
+      return node;
+    }
+    let args: unknown[];
+    try {
+      args = JSON.parse(config.functionArgs);
+    } catch {
+      // eslint-disable-next-line no-console
+      console.warn(
+        'scopeApproveNodeAmounts: could not parse functionArgs as JSON — leaving unscoped.'
+      );
+      return node;
+    }
+    if (!Array.isArray(args) || args.length !== 2) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `scopeApproveNodeAmounts: approve() functionArgs had ${
+          Array.isArray(args) ? args.length : typeof args
+        } entries, expected [spender, amount] — leaving unscoped.`
+      );
+      return node;
+    }
+    const [spender] = args;
+    return {
+      ...node,
+      data: {
+        ...node.data,
+        config: {
+          ...config,
+          functionArgs: JSON.stringify([spender, rawAmount]),
+        },
+      },
+    };
+  });
+}
 
 /**
  * KeeperHub uses generic web3 action types (e.g., 'web3/read-contract', 'web3/write-contract')
@@ -509,14 +583,15 @@ export async function buildStopLossWorkflow(params: {
   tokenAddress: string;
   thresholdPrice: number;
   targetToken: string;
+  sellAmount: string; // raw base-units of tokenAddress to sell when triggered — no more MAX_UINT256 default
 }): Promise<{ nodes: MCPWorkflowNode[]; edges: MCPWorkflowEdge[] }> {
   try {
     const prompt = `Create a stop-loss workflow for address ${params.address}.
     Monitor the price of token at ${params.tokenAddress}. When the price drops below ${params.thresholdPrice},
-    automatically sell the position for ${params.targetToken} to limit losses.
+    automatically sell ${params.sellAmount} (raw base units) of the position for ${params.targetToken} to limit losses.
     The workflow should use reliable price oracles and execute trades efficiently when the threshold is breached.
-    Include an approve step for the spending contract (the Uniswap V3 Router) before the swap write action,
-    since the swap call will fail without it.`;
+    Include an approve step for the spending contract (the Uniswap V3 Router), scoped to exactly ${params.sellAmount},
+    before the swap write action, since the swap call will fail without it.`;
 
     console.log('Generating stop-loss workflow with params:', params);
 
@@ -626,7 +701,7 @@ export async function buildStopLossWorkflow(params: {
               abi: '[{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]',
               functionArgs: JSON.stringify([
                 UNISWAP_V3_ROUTER_ADDRESS,
-                MAX_UINT256
+                params.sellAmount
               ])
             },
             status: 'idle',
@@ -653,7 +728,7 @@ export async function buildStopLossWorkflow(params: {
                   fee: 3000,
                   recipient: params.address,
                   deadline: Math.floor(Date.now() / 1000) + 3600,
-                  amountIn: MAX_UINT256,
+                  amountIn: params.sellAmount,
                   amountOutMinimum: '0',
                   sqrtPriceLimitX96: '0'
                 }

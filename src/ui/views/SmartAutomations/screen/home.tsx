@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { parseUnits } from 'viem';
 import { PageHeader } from '@/ui/component';
 import { useWallet } from '@/ui/utils';
 import { useCurrentAccount } from '@/ui/hooks/backgroundState/useAccount';
@@ -8,6 +9,9 @@ import {
   buildYieldHarvesterWorkflow,
   buildStopLossWorkflow,
   buildTwapWorkflow,
+  scopeApproveNodeAmounts,
+  MAX_UINT256,
+  USDC_ADDRESS,
 } from '../workflowTemplates';
 import { listVerifiedChains, type ChainContracts } from '../chainRegistry';
 import {
@@ -36,6 +40,7 @@ interface StopLossParams {
   tokenAddress: string;
   thresholdPrice: number;
   targetToken: string;
+  sellAmount: string; // raw base units — replaces the old MAX_UINT256 default
 }
 
 interface TwapParams {
@@ -59,12 +64,16 @@ interface AutomationConfig {
   summary: (stopLossParams?: StopLossParams, twapParams?: TwapParams) => WorkflowConsentSummary;
   // Stop-loss and TWAP need small forms filled in before we can build the workflow.
   needsForm?: boolean;
-  approveToken?: (params?: StopLossParams | TwapParams) => string;
+  approveToken?: (
+    stopLossParams?: StopLossParams,
+    twapParams?: TwapParams
+  ) => string | undefined;
 }
 
 const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
   'liquidation-shield': {
     label: 'Liquidation Shield (HF < 1.15)',
+    approveToken: () => USDC_ADDRESS,
     build: (address) =>
       buildLiquidationShieldWorkflow({
         address,
@@ -96,6 +105,7 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
   'stop-loss': {
     label: 'Stop-Loss (Uniswap v3)',
     needsForm: true,
+    approveToken: (params) => params?.tokenAddress,
     build: (address, stopLossParams, _twapParams) => {
       if (!stopLossParams) {
         throw new Error('Stop-loss requires token, threshold, and target token');
@@ -105,6 +115,7 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
         tokenAddress: stopLossParams.tokenAddress,
         thresholdPrice: stopLossParams.thresholdPrice,
         targetToken: stopLossParams.targetToken,
+        sellAmount: stopLossParams.sellAmount,
       });
     },
     summary: (stopLossParams) => ({
@@ -119,8 +130,9 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
     }),
   },
   'twap': {
-    label: 'TWAP (Uniswap v3)',
+    label: 'Scheduled Swap (Uniswap v3) — not a real TWAP',
     needsForm: true,
+    approveToken: (_stopLossParams, twapParams) => twapParams?.sellToken,
     build: (address, _stopLossParams, twapParams) => {
       if (!twapParams) {
         throw new Error('TWAP requires sell token, buy token, amount, parts, and duration');
@@ -137,12 +149,17 @@ const AUTOMATIONS: Record<AutomationType, AutomationConfig> = {
     },
     summary: (stopLossParams, twapParams) => ({
       protocol: 'Uniswap V3',
-      action: 'AI-generated TWAP swap',
+      action:
+        'Repeated one-shot swaps on a schedule — NOT a time-weighted-average-price ' +
+        'order. Real TWAP (via CoW Protocol ComposableCoW) requires a Safe with ' +
+        'Zodiac Roles delegation set up first; until then this button falls back ' +
+        'to plain scheduled Uniswap swaps.',
       triggerCondition: twapParams
         ? `${twapParams.numParts} parts over ${twapParams.partDurationSeconds}s each`
         : 'TWAP schedule',
       chain: 'Ethereum',
       tokenSymbol: twapParams?.sellToken?.slice(0, 8) || 'sell token',
+      maxAmount: twapParams?.totalSellAmount,
     }),
   },
 };
@@ -166,11 +183,25 @@ const SmartAutomations = () => {
     edges: any[];
   } | null>(null);
 
+  // Approval-scoping state — this is what got deleted in the regression.
+  // pendingApproveToken/pendingApproveDecimals are resolved once, when the
+  // consent modal opens, so handleConfirmCreate can convert the user's
+  // human-typed amount into the correct raw base-unit string.
+  const [rawAmount, setRawAmount] = useState('');
+  const [allowUnlimited, setAllowUnlimited] = useState(false);
+  const [pendingApproveToken, setPendingApproveToken] = useState<
+    string | undefined
+  >(undefined);
+  const [pendingApproveDecimals, setPendingApproveDecimals] = useState<
+    number | null
+  >(null);
+
   // Stop-loss form state
   const [stopLossForm, setStopLossForm] = useState<StopLossParams>({
     tokenAddress: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // WETH
     thresholdPrice: 2000,
     targetToken: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48', // USDC
+    sellAmount: '1000000000000000000', // 1 WETH in wei — replaces the old MAX_UINT256 default
   });
   const [showStopLossForm, setShowStopLossForm] = useState(false);
 
@@ -227,12 +258,39 @@ const SmartAutomations = () => {
         );
         setPendingType(type);
         setPendingWorkflow(built);
+
+        // Reset amount-scoping state for the new workflow, then resolve
+        // which token (if any) needs an approval cap.
+        setRawAmount('');
+        setAllowUnlimited(false);
+        setPendingApproveDecimals(null);
+        const approveToken = AUTOMATIONS[type].approveToken?.(
+          stopLossParams,
+          twapParams
+        );
+        setPendingApproveToken(approveToken);
+        if (approveToken) {
+          try {
+            const { decimals } = await wallet.getErc20DecimalsAndBalance({
+              address: account.address,
+              tokenAddress: approveToken,
+              chainId: selectedChain?.chainId ?? 1,
+            });
+            setPendingApproveDecimals(decimals);
+          } catch (decimalsError) {
+            console.error('Failed to fetch token decimals:', decimalsError);
+            // Leave pendingApproveDecimals null — the modal treats that as
+            // "can't validate an amount yet" and keeps Confirm disabled
+            // unless the user explicitly checks "allow unlimited".
+          }
+        }
+
         setShowConsent(true);
       } catch (e) {
         message.error((e as Error).message);
       }
     },
-    [account?.address]
+    [account?.address, wallet, selectedChain]
   );
 
   const handleAutomationButtonClick = useCallback(
@@ -254,9 +312,12 @@ const SmartAutomations = () => {
     if (
       !stopLossForm.tokenAddress ||
       !stopLossForm.targetToken ||
-      !stopLossForm.thresholdPrice
+      !stopLossForm.thresholdPrice ||
+      !stopLossForm.sellAmount
     ) {
-      message.error('Fill in token to watch, threshold price, and target token');
+      message.error(
+        'Fill in token to watch, threshold price, target token, and amount to sell'
+      );
       return;
     }
     setShowStopLossForm(false);
@@ -284,8 +345,36 @@ const SmartAutomations = () => {
 
     try {
       let nodesToSubmit = pendingWorkflow.nodes;
-      // Approval amount handling removed - AI generation handles proper action types
-      // The KeeperHub AI generates workflows with correct protocol-specific action types
+
+      // Scope the approve() amount before anything gets submitted. This is
+      // the safety mechanism that was deleted in a prior pass — restoring
+      // it here rather than leaving fallback templates' hardcoded
+      // MAX_UINT256 (or whatever KeeperHub's AI path returns) unscoped.
+      if (pendingApproveToken) {
+        if (allowUnlimited) {
+          nodesToSubmit = scopeApproveNodeAmounts(nodesToSubmit, MAX_UINT256);
+        } else {
+          if (pendingApproveDecimals === null) {
+            message.error(
+              'Could not determine token decimals — cannot safely scope the ' +
+                'approval amount. Try again, or check "allow unlimited" if you ' +
+                'understand the risk.'
+            );
+            return;
+          }
+          let scopedAmount: string;
+          try {
+            scopedAmount = parseUnits(
+              rawAmount as `${number}`,
+              pendingApproveDecimals
+            ).toString();
+          } catch {
+            message.error('Enter a valid amount');
+            return;
+          }
+          nodesToSubmit = scopeApproveNodeAmounts(nodesToSubmit, scopedAmount);
+        }
+      }
 
       // If the user has configured a Safe + Zodiac Roles Modifier, route
       // execution through the role instead of executing directly — see
@@ -344,6 +433,10 @@ const SmartAutomations = () => {
     stopLossForm,
     twapForm,
     selectedChain,
+    rawAmount,
+    allowUnlimited,
+    pendingApproveToken,
+    pendingApproveDecimals,
   ]);
 
   const handleCancelConsent = useCallback(() => {
@@ -510,6 +603,13 @@ const SmartAutomations = () => {
                 setStopLossForm((f) => ({ ...f, targetToken: e.target.value }))
               }
             />
+            <Input
+              placeholder="Amount to sell (raw base units) — replaces the old unlimited default"
+              value={stopLossForm.sellAmount}
+              onChange={(e) =>
+                setStopLossForm((f) => ({ ...f, sellAmount: e.target.value }))
+              }
+            />
             <div className="flex gap-8">
               <Button type="primary" onClick={handleConfirmStopLossForm}>
                 Continue
@@ -615,12 +715,23 @@ const SmartAutomations = () => {
           visible={showConsent}
           workflowType={AUTOMATIONS[pendingType].label}
           summary={AUTOMATIONS[pendingType].summary(
-            pendingType === 'stop-loss' ? stopLossForm : pendingType === 'twap' ? twapForm : undefined,
-            pendingType === 'stop-loss' ? undefined : pendingType === 'twap' ? twapForm : undefined
+            pendingType === 'stop-loss' ? stopLossForm : undefined,
+            pendingType === 'twap' ? twapForm : undefined
           )}
           onConfirm={handleConfirmCreate}
           onCancel={handleCancelConsent}
           loading={loading}
+          showApprovalControls={Boolean(pendingApproveToken)}
+          amount={rawAmount}
+          onAmountChange={setRawAmount}
+          allowUnlimited={allowUnlimited}
+          onAllowUnlimitedChange={setAllowUnlimited}
+          amountValid={
+            pendingApproveDecimals !== null &&
+            rawAmount.trim() !== '' &&
+            !Number.isNaN(Number(rawAmount)) &&
+            Number(rawAmount) > 0
+          }
         />
       )}
     </div>
