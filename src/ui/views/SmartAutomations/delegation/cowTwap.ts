@@ -64,7 +64,7 @@
  *    to be added (`"@cowprotocol/sdk-viem-adapter": "^0.3.28"`).
  */
 
-import { createPublicClient, http, type Hex } from 'viem';
+import { createPublicClient, custom, type Hex } from 'viem';
 import { ViemAdapter } from '@cowprotocol/sdk-viem-adapter';
 import {
   setGlobalAdapter,
@@ -108,18 +108,45 @@ export interface TwapOrderParams {
   appData: string; // bytes32
 }
 
+/**
+ * Minimal EIP-1193 shape (same as safeDeployment.ts's Eip1193Provider) —
+ * kept as a separate local type so this file has no import-order
+ * dependency on safeDeployment.ts.
+ */
+export interface Eip1193Provider {
+  request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
+}
+
 let adapterRegisteredForChain: number | null = null;
 
 /**
  * Registers the viem-based provider adapter the sdk-composable package
  * needs before it can build any conditional order. Idempotent per chain
  * so repeated calls (e.g. from re-renders) don't thrash the global
- * adapter. `rpcUrl` should come from Rabby's own chain config, not a
- * hardcoded third-party endpoint.
+ * adapter.
+ *
+ * IMPORTANT: this takes an EIP-1193 `provider` (Rabby's own
+ * `wallet.requestETHRpc` wrapped as `{ request }`), not a raw RPC URL —
+ * an earlier version tried to look up a `.rpcUrl` field on Rabby's chain
+ * object and pass it to viem's `http()` transport. That field doesn't
+ * exist on Rabby's real `Chain` type (it's only present on `TestnetChain`
+ * for custom testnets), so on every real chain it silently resolved to
+ * an empty string, and viem's `http('')` throws `UrlRequiredError`
+ * immediately — confirmed by reproducing it against the actual installed
+ * viem version. Using `custom(provider)` with Rabby's own RPC routing
+ * sidesteps the missing field entirely instead of trying to rediscover
+ * where Rabby stores RPC URLs (`rpcService.getDefaultRPCByChainServerId`,
+ * which returns an array, not a single string, and lives in the
+ * background service — not something this UI-layer file should reach
+ * into directly).
  */
-function ensureAdapterForChain(chainId: number, rpcUrl: string, chain: { id: number; name: string; nativeCurrency: any; rpcUrls: any }) {
+function ensureAdapterForChain(
+  chainId: number,
+  provider1193: Eip1193Provider,
+  chain: { id: number; name: string; nativeCurrency: any; rpcUrls: any }
+) {
   if (adapterRegisteredForChain === chainId) return;
-  const provider = createPublicClient({ chain: chain as any, transport: http(rpcUrl) });
+  const provider = createPublicClient({ chain: chain as any, transport: custom(provider1193 as any) });
   // ViemAdapter's own internal address-checksum utility returns `string`
   // where the abstract adapter type in @cowprotocol/sdk-common expects a
   // branded `0x${string}` — a type-strictness mismatch between their two
@@ -188,13 +215,13 @@ export async function assertSafeReadyForComposableCow(
  *
  * @param params - TWAP order parameters
  * @param chainId - The chain ID the Safe and ComposableCoW deployment are on
- * @param rpcConfig - Rabby's own RPC URL + viem chain descriptor for chainId
- *   (never a hardcoded third-party endpoint — see ensureAdapterForChain)
+ * @param rpcConfig - Rabby's own EIP-1193 provider + viem chain descriptor
+ *   for chainId (never a raw RPC URL string — see ensureAdapterForChain)
  */
 export function buildTwapCreateTransaction(
   params: TwapOrderParams,
   chainId: number,
-  rpcConfig: { rpcUrl: string; viemChain: { id: number; name: string; nativeCurrency: any; rpcUrls: any } }
+  rpcConfig: { provider: Eip1193Provider; viemChain: { id: number; name: string; nativeCurrency: any; rpcUrls: any } }
 ): { to: string; value: string; data: string; orderId: string } {
   if (params.numParts < 2) {
     throw new Error('TWAP requires at least 2 parts');
@@ -209,7 +236,7 @@ export function buildTwapCreateTransaction(
   }
 
   const deployment = getComposableCowDeployment(chainId);
-  ensureAdapterForChain(chainId, rpcConfig.rpcUrl, rpcConfig.viemChain);
+  ensureAdapterForChain(chainId, rpcConfig.provider, rpcConfig.viemChain);
 
   const data: TwapData = {
     sellToken: params.sellToken,

@@ -27,6 +27,7 @@ import {
   buildTwapCreateTransaction,
   assertSafeReadyForComposableCow,
   getComposableCowDeployment,
+  type Eip1193Provider,
 } from '../delegation/cowTwap';
 import {
   useAaveForkPosition,
@@ -382,10 +383,21 @@ const SmartAutomations = () => {
         if (readyCheck.ready) {
           // Use real TWAP path - create transaction directly, not a KeeperHub workflow
           try {
-            // Get RPC URL from chain config
+            // Build a viem chain descriptor from Rabby's own chain data —
+            // no separate RPC URL lookup needed. The transport below
+            // proxies through wallet.requestETHRpc (Rabby's real RPC
+            // routing), not a URL string, so this doesn't hit the
+            // "chain.rpcUrl doesn't exist" bug the previous version had.
             const chainConfig = findChain({ serverId: selectedChain.serverId });
-            const rpcUrl = (chainConfig as any)?.rpcUrl || '';
-            const viemChain = chainToViemChain(selectedChain, rpcUrl);
+            const viemChain = chainToViemChain(selectedChain, {
+              name: 'Ether',
+              symbol: (chainConfig as any)?.nativeTokenSymbol || 'ETH',
+              decimals: (chainConfig as any)?.nativeTokenDecimals ?? 18,
+            });
+            const eip1193Provider: Eip1193Provider = {
+              request: ({ method, params }: { method: string; params?: unknown }) =>
+                wallet.requestETHRpc({ method, params }, selectedChain.serverId),
+            };
 
             const tx = buildTwapCreateTransaction(
               {
@@ -399,7 +411,7 @@ const SmartAutomations = () => {
                 appData: '0x0000000000000000000000000000000000000000000000000000000000000000', // Default appData (bytes32)
               },
               roleDelegation.chainId,
-              { rpcUrl, viemChain }
+              { provider: eip1193Provider, viemChain }
             );
 
             // Send the transaction via Rabby's confirmation flow

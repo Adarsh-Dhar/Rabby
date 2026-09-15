@@ -101,8 +101,24 @@ export function listVerifiedChains(): ChainContracts[] {
 /**
  * Adapter to convert Rabby's chain data to viem's Chain shape for cowTwap.ts.
  * This builds a minimal viem Chain object from what Rabby already has.
+ *
+ * `nativeCurrency` must be passed in by the caller from Rabby's own chain
+ * data (`findChain(...).nativeTokenSymbol` / `.nativeTokenDecimals`) rather
+ * than hardcoded here — an earlier version hardcoded `symbol: 'ETH'`
+ * unconditionally, which happens to be correct for the 3 chains currently
+ * in CHAIN_REGISTRY (all ETH-native) but would silently mislabel the first
+ * non-ETH chain added later.
+ *
+ * `rpcUrls` is populated with an empty list deliberately: the transport
+ * used with this chain object is viem's `custom()` (proxied through
+ * Rabby's own `wallet.requestETHRpc`), which never consults
+ * `chain.rpcUrls` — see cowTwap.ts's `ensureAdapterForChain` for why a
+ * plain RPC URL string isn't used here.
  */
-export function chainToViemChain(chain: ChainContracts, rpcUrl: string): {
+export function chainToViemChain(
+  chain: ChainContracts,
+  nativeCurrency: { name: string; symbol: string; decimals: number }
+): {
   id: number;
   name: string;
   nativeCurrency: { name: string; symbol: string; decimals: number };
@@ -111,14 +127,10 @@ export function chainToViemChain(chain: ChainContracts, rpcUrl: string): {
   return {
     id: chain.chainId,
     name: chain.label,
-    nativeCurrency: {
-      name: 'Ether',
-      symbol: 'ETH',
-      decimals: 18,
-    },
+    nativeCurrency,
     rpcUrls: {
       default: {
-        http: [rpcUrl],
+        http: [],
       },
     },
   };
