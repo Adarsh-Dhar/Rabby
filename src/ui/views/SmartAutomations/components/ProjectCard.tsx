@@ -1,6 +1,9 @@
 import React from 'react';
 import { Card, Button, Switch, Popconfirm, message } from 'antd';
-import { DeleteOutlined, EditOutlined, PlayCircleOutlined, PauseCircleOutlined } from '@ant-design/icons';
+import { ReactComponent as RcIconEdit } from 'ui/assets/edit-pen-cc.svg';
+import { ReactComponent as RcIconDelete } from 'ui/assets/address/delete.svg';
+import ThemeIcon from '@/ui/component/ThemeMode/ThemeIcon';
+import clsx from 'clsx';
 
 export interface WorkflowRow {
   workflowId: string;
@@ -65,36 +68,6 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     <Card
       className="border-r-neutral-line hover:border-r-neutral-foot transition-colors"
       loading={loading}
-      actions={[
-        <Button
-          key="edit"
-          type="text"
-          icon={<EditOutlined />}
-          onClick={() => onEdit(workflow.workflowId)}
-        >
-          Edit
-        </Button>,
-        <Switch
-          key="toggle"
-          checked={isEnabled}
-          onChange={handleToggle}
-          checkedChildren={<PlayCircleOutlined />}
-          unCheckedChildren={<PauseCircleOutlined />}
-        />,
-        <Popconfirm
-          key="delete"
-          title="Delete this workflow?"
-          description="This action cannot be undone. The workflow will be removed from your account."
-          onConfirm={handleDelete}
-          okText="Delete"
-          cancelText="Cancel"
-          okButtonProps={{ danger: true }}
-        >
-          <Button type="text" danger icon={<DeleteOutlined />}>
-            Delete
-          </Button>
-        </Popconfirm>,
-      ]}
     >
       <div className="flex flex-col gap-8">
         <div className="flex justify-between items-start">
@@ -110,8 +83,38 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             {getStatusText()}
           </div>
         </div>
-        <div className="text-r-neutral-foot text-12">
-          Created {new Date(workflow.createdAt).toLocaleDateString()}
+        <div className="flex justify-between items-center">
+          <div className="text-r-neutral-foot text-12">
+            Created {new Date(workflow.createdAt).toLocaleDateString()}
+          </div>
+          <div className="flex items-center gap-8">
+            <Button
+              type="text"
+              size="small"
+              icon={<ThemeIcon src={RcIconEdit} className="w-14 h-14" />}
+              onClick={() => onEdit(workflow.workflowId)}
+            />
+            <Switch
+              size="small"
+              checked={isEnabled}
+              onChange={handleToggle}
+            />
+            <Popconfirm
+              title="Delete this workflow?"
+              description="This action cannot be undone. The workflow will be removed from your account."
+              onConfirm={handleDelete}
+              okText="Delete"
+              cancelText="Cancel"
+              okButtonProps={{ danger: true }}
+            >
+              <Button
+                type="text"
+                size="small"
+                danger
+                icon={<ThemeIcon src={RcIconDelete} className="w-14 h-14" />}
+              />
+            </Popconfirm>
+          </div>
         </div>
       </div>
     </Card>

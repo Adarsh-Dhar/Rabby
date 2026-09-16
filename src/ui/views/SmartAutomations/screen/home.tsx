@@ -2,8 +2,9 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { PageHeader } from '@/ui/component';
 import { useWallet } from '@/ui/utils';
 import { useCurrentAccount } from '@/ui/hooks/backgroundState/useAccount';
-import { Button, Card, message, Select, Row, Col } from 'antd';
-import { PlusOutlined } from '@ant-design/icons';
+import { Button, message, Select, Row, Col } from 'antd';
+import { ReactComponent as RcIconPlus } from 'ui/assets/plus.svg';
+import ThemeIcon from '@/ui/component/ThemeMode/ThemeIcon';
 import { findChain } from '@/utils/chain';
 import { listVerifiedChains, type ChainContracts } from '../chainRegistry';
 import { ProjectCard, type WorkflowRow } from '../components/ProjectCard';
@@ -130,7 +131,7 @@ const SmartAutomations = () => {
   if (!hasApiKey) {
     return (
       <div className="p-20">
-        <PageHeader>Automations</PageHeader>
+        <PageHeader canBack={false}>Automations</PageHeader>
         <p className="text-r-neutral-body">
           Connect a KeeperHub API key in Settings to enable automations for this
           account.
@@ -159,22 +160,27 @@ const SmartAutomations = () => {
 
   return (
     <div className="p-20">
-      <PageHeader>
-        <div className="flex items-center justify-between">
-          <span>Automations</span>
+      <PageHeader
+        canBack={false}
+        className="mb-12"
+        rightSlot={
           <Button
             type="primary"
-            icon={<PlusOutlined />}
+            size="small"
+            icon={<ThemeIcon src={RcIconPlus} className="w-12 h-12" />}
             onClick={handleCreateNew}
           >
             New Automation
           </Button>
-        </div>
+        }
+      >
+        Automations
       </PageHeader>
 
-      <Card size="small" className="mb-16" title="Execution mode">
+      <div className="bg-r-neutral-card rounded-8 p-16 mb-16">
+        <div className="text-r-neutral-title text-14 font-medium mb-12">Execution mode</div>
         <div className="flex justify-between items-center">
-          <span>
+          <span className="text-r-neutral-body text-13">
             {roleDelegation
               ? `Safe + Roles (configured: ${roleDelegation.safeAddress.slice(0, 8)}…)`
               : 'Direct (EOA)'}
@@ -184,7 +190,7 @@ const SmartAutomations = () => {
           </Button>
         </div>
         {showDelegationSettings && (
-          <div className="mt-16">
+          <div className="mt-12">
             <DelegationSettings
               value={roleDelegation}
               onSave={async (value) => {
@@ -223,12 +229,15 @@ const SmartAutomations = () => {
             />
           </div>
         )}
-      </Card>
+      </div>
 
-      <Card size="small" className="mb-16" title={`Discovery — ${selectedChain?.label || 'Select a chain'}`}>
-        <div className="flex flex-col gap-8 text-13">
+      <div className="bg-r-neutral-card rounded-8 p-16 mb-16">
+        <div className="text-r-neutral-title text-14 font-medium mb-12">
+          Discovery — {selectedChain?.label || 'Select a chain'}
+        </div>
+        <div className="flex flex-col gap-12 text-13">
           <div className="flex justify-between items-center">
-            <span>Chain</span>
+            <span className="text-r-neutral-body">Chain</span>
             <Select
               value={selectedChain?.label}
               onChange={(value) => {
@@ -236,6 +245,7 @@ const SmartAutomations = () => {
                 if (chain) setSelectedChain(chain);
               }}
               style={{ width: 200 }}
+              size="small"
             >
               {listVerifiedChains().map((chain) => (
                 <Select.Option key={chain.label} value={chain.label}>
@@ -247,13 +257,13 @@ const SmartAutomations = () => {
 
           {selectedChain?.aaveV3Pool && (
             <div className="flex justify-between">
-              <span>Aave V3</span>
-              {healthFactorData.loading && <span>Loading…</span>}
+              <span className="text-r-neutral-body">Aave V3</span>
+              {healthFactorData.loading && <span className="text-r-neutral-foot">Loading…</span>}
               {healthFactorData.error && (
                 <span className="text-red-forbidden">Error</span>
               )}
               {!healthFactorData.loading && !healthFactorData.error && (
-                <span>
+                <span className="text-r-neutral-body">
                   HF{' '}
                   {healthFactorData.healthFactor === 0
                     ? '—'
@@ -264,14 +274,19 @@ const SmartAutomations = () => {
             </div>
           )}
         </div>
-      </Card>
+      </div>
 
       <div className="mb-16">
         <h3 className="text-r-neutral-title text-16 mb-12">Your Workflows</h3>
         {workflows.length === 0 ? (
           <div className="text-center text-r-neutral-foot py-32">
-            <div className="text-14 mb-8">No workflows yet</div>
-            <div className="text-12">
+            <img
+              className="w-[100px] mx-auto mb-16"
+              src="/images/nodata-tx.png"
+              alt="no workflows"
+            />
+            <div className="text-14 mb-8 text-r-neutral-body">No workflows yet</div>
+            <div className="text-12 text-r-neutral-foot">
               Create your first automation to get started
             </div>
           </div>

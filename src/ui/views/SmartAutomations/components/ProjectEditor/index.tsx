@@ -1,6 +1,8 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Button, message, Tabs, Spin } from 'antd';
-import { CloseOutlined, SaveOutlined } from '@ant-design/icons';
+import { ReactComponent as RcIconClose } from 'ui/assets/component/close-cc.svg';
+import { ReactComponent as RcIconCheck } from 'ui/assets/check.svg';
+import ThemeIcon from '@/ui/component/ThemeMode/ThemeIcon';
 import { useWallet } from '@/ui/utils';
 import { useCurrentAccount } from '@/ui/hooks/backgroundState/useAccount';
 import type { MCPWorkflowNode, MCPWorkflowEdge } from 'background/service/keeperhubMCP';
@@ -309,7 +311,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between p-16 border-b border-r-neutral-line">
+      <div className="flex items-center justify-between px-16 py-12 border-b border-r-neutral-line">
         <div className="flex items-center gap-12">
           <h2 className="text-r-neutral-title text-18 font-medium">
             {workflowId ? 'Edit Workflow' : 'New Workflow'}
@@ -318,13 +320,13 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
         <div className="flex items-center gap-8">
           <Button
             type="primary"
-            icon={<SaveOutlined />}
+            icon={<ThemeIcon src={RcIconCheck} className="w-14 h-14" />}
             onClick={handleConfirmSave}
             disabled={!draftDefinition.name || draftDefinition.nodes.length === 0}
           >
             Save
           </Button>
-          <Button icon={<CloseOutlined />} onClick={onCancel}>
+          <Button icon={<ThemeIcon src={RcIconClose} className="w-14 h-14" />} onClick={onCancel}>
             Cancel
           </Button>
         </div>

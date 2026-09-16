@@ -1,6 +1,8 @@
 import React from 'react';
-import { Input, Card, Collapse, Button, Space, Tag } from 'antd';
-import { PlusOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Input, Collapse, Button, Tag } from 'antd';
+import { ReactComponent as RcIconPlus } from 'ui/assets/plus.svg';
+import { ReactComponent as RcIconDelete } from 'ui/assets/address/delete.svg';
+import ThemeIcon from '@/ui/component/ThemeMode/ThemeIcon';
 import type { MCPWorkflowNode, MCPWorkflowEdge } from 'background/service/keeperhubMCP';
 import type { DraftDefinition } from './index';
 
@@ -104,6 +106,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
               value={typeof value === 'string' ? value : JSON.stringify(value)}
               onChange={(e) => handleNodeConfigChange(index, key, e.target.value)}
               className="flex-1"
+              size="small"
             />
           </div>
         ))}
@@ -114,7 +117,8 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
   return (
     <div className="flex flex-col h-full p-16 gap-16 overflow-y-auto">
       {/* Basic Info */}
-      <Card title="Workflow Details" size="small">
+      <div className="bg-r-neutral-card rounded-8 p-16">
+        <div className="text-r-neutral-title text-14 font-medium mb-12">Workflow Details</div>
         <div className="flex flex-col gap-12">
           <div>
             <div className="text-r-neutral-foot text-12 mb-4">Name</div>
@@ -122,6 +126,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
               value={definition.name}
               onChange={handleNameChange}
               placeholder="Workflow name"
+              size="small"
             />
           </div>
           {definition.description !== undefined && (
@@ -132,29 +137,28 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
                 onChange={handleDescriptionChange}
                 placeholder="Workflow description"
                 autoSize={{ minRows: 2, maxRows: 4 }}
+                size="small"
               />
             </div>
           )}
         </div>
-      </Card>
+      </div>
 
       {/* Nodes */}
-      <Card
-        title={
-          <div className="flex items-center justify-between">
-            <span>Nodes ({definition.nodes.length})</span>
-            <Button
-              type="text"
-              size="small"
-              icon={<PlusOutlined />}
-              onClick={addNode}
-            >
-              Add Node
-            </Button>
+      <div className="bg-r-neutral-card rounded-8 p-16">
+        <div className="flex items-center justify-between mb-12">
+          <div className="text-r-neutral-title text-14 font-medium">
+            Nodes ({definition.nodes.length})
           </div>
-        }
-        size="small"
-      >
+          <Button
+            type="text"
+            size="small"
+            icon={<ThemeIcon src={RcIconPlus} className="w-14 h-14" />}
+            onClick={addNode}
+          >
+            Add Node
+          </Button>
+        </div>
         <div className="flex flex-col gap-12">
           {definition.nodes.map((node, index) => (
             <Collapse
@@ -175,7 +179,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
                         type="text"
                         size="small"
                         danger
-                        icon={<DeleteOutlined />}
+                        icon={<ThemeIcon src={RcIconDelete} className="w-14 h-14" />}
                         onClick={(e) => {
                           e.stopPropagation();
                           removeNode(index);
@@ -191,6 +195,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
                           <Input
                             value={node.data?.label || ''}
                             onChange={(e) => handleNodeDataChange(index, 'label', e.target.value)}
+                            size="small"
                           />
                         </div>
                         <div className="flex-1">
@@ -198,6 +203,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
                           <Input
                             value={node.data?.type || ''}
                             onChange={(e) => handleNodeDataChange(index, 'type', e.target.value)}
+                            size="small"
                           />
                         </div>
                       </div>
@@ -207,6 +213,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
                           value={node.data?.description || ''}
                           onChange={(e) => handleNodeDataChange(index, 'description', e.target.value)}
                           autoSize={{ minRows: 1, maxRows: 3 }}
+                          size="small"
                         />
                       </div>
                       <div>
@@ -220,29 +227,27 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
             />
           ))}
         </div>
-      </Card>
+      </div>
 
       {/* Edges */}
-      <Card
-        title={
-          <div className="flex items-center justify-between">
-            <span>Edges ({definition.edges.length})</span>
-            <Button
-              type="text"
-              size="small"
-              icon={<PlusOutlined />}
-              onClick={addEdge}
-              disabled={definition.nodes.length < 2}
-            >
-              Add Edge
-            </Button>
+      <div className="bg-r-neutral-card rounded-8 p-16">
+        <div className="flex items-center justify-between mb-12">
+          <div className="text-r-neutral-title text-14 font-medium">
+            Edges ({definition.edges.length})
           </div>
-        }
-        size="small"
-      >
+          <Button
+            type="text"
+            size="small"
+            icon={<ThemeIcon src={RcIconPlus} className="w-14 h-14" />}
+            onClick={addEdge}
+            disabled={definition.nodes.length < 2}
+          >
+            Add Edge
+          </Button>
+        </div>
         <div className="flex flex-col gap-8">
           {definition.edges.map((edge, index) => (
-            <div key={edge.id} className="flex items-center gap-8 p-8 bg-r-neutral-card rounded-4">
+            <div key={edge.id} className="flex items-center gap-8 p-8 bg-r-neutral-card-1 rounded-4">
               <div className="flex-1">
                 <div className="text-r-neutral-foot text-12 mb-4">Source</div>
                 <Input
@@ -252,6 +257,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
                     newEdges[index] = { ...newEdges[index], source: e.target.value };
                     onChange({ edges: newEdges });
                   }}
+                  size="small"
                 />
               </div>
               <div className="text-r-neutral-foot">→</div>
@@ -264,19 +270,20 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
                     newEdges[index] = { ...newEdges[index], target: e.target.value };
                     onChange({ edges: newEdges });
                   }}
+                  size="small"
                 />
               </div>
               <Button
                 type="text"
                 danger
                 size="small"
-                icon={<DeleteOutlined />}
+                icon={<ThemeIcon src={RcIconDelete} className="w-14 h-14" />}
                 onClick={() => removeEdge(index)}
               />
             </div>
           ))}
         </div>
-      </Card>
+      </div>
     </div>
   );
 };
