@@ -115,7 +115,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
   };
 
   return (
-    <div className="flex flex-col h-full p-16 gap-16 overflow-y-auto">
+    <div className="flex min-h-0 flex-col h-full gap-16 overflow-y-auto p-16">
       {/* Basic Info */}
       <div className="bg-r-neutral-card rounded-8 p-16">
         <div className="text-r-neutral-title text-14 font-medium mb-12">Workflow Details</div>

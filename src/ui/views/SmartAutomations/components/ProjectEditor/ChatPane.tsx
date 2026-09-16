@@ -159,9 +159,9 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
   }, [pendingProposal, draftDefinition]);
 
   return (
-    <div className="flex flex-col h-full p-16 gap-16">
+    <div className="flex min-h-0 flex-col h-full gap-16 p-16">
       {/* Chat Messages */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         {messages.length === 0 && (
           <div className="text-center text-r-neutral-foot py-32">
             <div className="text-16 mb-8">Start building your workflow</div>
