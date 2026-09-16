@@ -309,7 +309,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex min-h-0 flex-col h-full overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-16 py-12 border-b border-r-neutral-line">
         <div className="flex items-center gap-12">
@@ -333,8 +333,9 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
       </div>
 
       {/* Editor Content */}
-      <div className="flex-1 overflow-hidden">
+      <div className="flex min-h-0 flex-1 overflow-hidden">
         <Tabs
+          className="flex h-full min-h-0 w-full flex-col"
           activeKey={mode}
           onChange={setMode}
           items={[
