@@ -28,5 +28,6 @@ export { default as perpsService } from './perps';
 export { default as keeperhubService } from './keeperhub';
 export { default as roleDelegationService } from './roleDelegation';
 export { default as keeperhubMCPService } from './keeperhubMCP';
+export { default as aiProviderService } from './aiProvider';
 export { default as miscService } from './misc';
 export { default as feedbackService } from './feedback';

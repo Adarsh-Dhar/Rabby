@@ -546,6 +546,167 @@ class KeeperhubMCPService {
   }
 
   /**
+   * Update a workflow
+   * NOTE: The endpoint path (PATCH /api/workflows/{id}) is inferred from the existing pattern
+   * and has not been verified against KeeperHub's actual API documentation. This should be confirmed
+   * before shipping to production.
+   */
+  async updateWorkflow(
+    workflowId: string,
+    patch: {
+      name?: string;
+      enabled?: boolean;
+      nodes?: MCPWorkflowNode[];
+      edges?: MCPWorkflowEdge[];
+    }
+  ): Promise<MCPWorkflowResponse> {
+    const apiKey = await this.getApiKey();
+    if (!apiKey) {
+      throw new Error('KeeperHub API key is not configured');
+    }
+
+    if (!this.validateApiKey(apiKey)) {
+      throw new Error('Invalid KeeperHub API key format');
+    }
+
+    if (!workflowId || workflowId.trim().length === 0) {
+      throw new Error('Workflow ID is required');
+    }
+
+    if (Object.keys(patch).length === 0) {
+      throw new Error('Update patch must include at least one field');
+    }
+
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/api/workflows/${workflowId}`,
+        {
+          method: 'PATCH',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(patch),
+          credentials: 'omit',
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Workflow update failed: ${response.status}`;
+
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage += ` - ${errorJson.message || errorText}`;
+        } catch {
+          errorMessage += ` - ${errorText}`;
+        }
+
+        throw new Error(errorMessage);
+      }
+
+      const result = await response.json();
+
+      if (!result.id) {
+        throw new Error('Invalid workflow response: missing workflow ID');
+      }
+
+      return result;
+    } catch (error) {
+      console.error('KeeperHub MCP workflow update error:', error);
+
+      if (error instanceof Error) {
+        if (
+          error.message.includes('API key') ||
+          error.message.includes('Workflow ID')
+        ) {
+          throw error;
+        }
+        if (
+          error.message.includes('fetch') ||
+          error.message.includes('network')
+        ) {
+          throw new Error(
+            'Network error connecting to KeeperHub. Please check your connection.'
+          );
+        }
+      }
+
+      throw new Error('Failed to update workflow. Please try again later.');
+    }
+  }
+
+  /**
+   * Delete a workflow
+   * NOTE: The endpoint path (DELETE /api/workflows/{id}) is inferred from the existing pattern
+   * and has not been verified against KeeperHub's actual API documentation. This should be confirmed
+   * before shipping to production.
+   */
+  async deleteWorkflow(workflowId: string): Promise<void> {
+    const apiKey = await this.getApiKey();
+    if (!apiKey) {
+      throw new Error('KeeperHub API key is not configured');
+    }
+
+    if (!this.validateApiKey(apiKey)) {
+      throw new Error('Invalid KeeperHub API key format');
+    }
+
+    if (!workflowId || workflowId.trim().length === 0) {
+      throw new Error('Workflow ID is required');
+    }
+
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/api/workflows/${workflowId}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          credentials: 'omit',
+        }
+      );
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        let errorMessage = `Workflow deletion failed: ${response.status}`;
+
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage += ` - ${errorJson.message || errorText}`;
+        } catch {
+          errorMessage += ` - ${errorText}`;
+        }
+
+        throw new Error(errorMessage);
+      }
+    } catch (error) {
+      console.error('KeeperHub MCP workflow deletion error:', error);
+
+      if (error instanceof Error) {
+        if (
+          error.message.includes('API key') ||
+          error.message.includes('Workflow ID')
+        ) {
+          throw error;
+        }
+        if (
+          error.message.includes('fetch') ||
+          error.message.includes('network')
+        ) {
+          throw new Error(
+            'Network error connecting to KeeperHub. Please check your connection.'
+          );
+        }
+      }
+
+      throw new Error('Failed to delete workflow. Please try again later.');
+    }
+  }
+
+  /**
    * Validate a workflow before creation
    * This corresponds to the validate_workflow MCP tool
    */
@@ -620,6 +781,18 @@ class KeeperhubMCPService {
       throw new Error('Failed to validate workflow. Please try again later.');
     }
   }
+
+  /**
+   * Find a workflow by name
+   * NOTE: This is a placeholder for the future general-chat entry point.
+   * When the chat system supports talking to automations by name (not just click-into-project),
+   * this will be used to resolve a workflow ID from a user-provided name.
+   * Currently not implemented as per the click-into-project-only scope.
+   */
+  // async findWorkflowByName(name: string): Promise<MCPWorkflowResponse | null> {
+  //   // Future implementation: search workflows by name and return the match
+  //   return null;
+  // }
 }
 
 export default new KeeperhubMCPService();

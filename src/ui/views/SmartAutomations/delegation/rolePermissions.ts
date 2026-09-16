@@ -1,5 +1,5 @@
 /**
- * Role permission generation for Smart Automations.
+ * Role permission generation for Automations.
  *
  * This module uses zodiac-roles-sdk to generate minimal permission sets
  * for each workflow template, so users don't have to manually build

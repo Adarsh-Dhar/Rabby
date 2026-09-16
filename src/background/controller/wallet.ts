@@ -47,6 +47,7 @@ import {
   keeperhubService,
   roleDelegationService,
   keeperhubMCPService,
+  aiProviderService,
   miscService,
   feedbackService,
 } from 'background/service';
@@ -6977,36 +6978,61 @@ export class WalletController extends BaseController {
   getPerpsSelectedCoin = perpsService.getSelectedCoin;
   getMarketSlippage = perpsService.getMarketSlippage;
 
-  // ---- KeeperHub Smart Automations ----
+  // ---- KeeperHub Automations ----
   // The kh_* API key is entered once by the user and held only in the
   // background persisted store (src/background/service/keeperhub.ts).
   // It is never exposed to dapp-facing contexts.
-  setKeeperhubApiKey = async (key: string) => {
+  async setKeeperhubApiKey(key: string) {
     await keeperhubService.setApiKey(key);
-  };
-  getKeeperhubApiKeyStatus = async () => Boolean(await keeperhubService.getApiKey());
-  clearKeeperhubApiKey = async () => await keeperhubService.clearApiKey();
+  }
+  async getKeeperhubApiKeyStatus() {
+    return Boolean(await keeperhubService.getApiKey());
+  }
+  async clearKeeperhubApiKey() {
+    await keeperhubService.clearApiKey();
+  }
 
   // Optional Safe + Zodiac Roles Modifier delegation config. See
   // src/background/service/roleDelegation.ts and
   // src/ui/views/SmartAutomations/delegation/zodiacRoles.ts. Rabby only
   // stores what the user pastes in here — it never derives or guesses
   // these addresses.
-  getRoleDelegation = (address: string) => roleDelegationService.get(address);
-  setRoleDelegation = (
+  getRoleDelegation(address: string) {
+    return roleDelegationService.get(address);
+  }
+  setRoleDelegation(
     address: string,
     config: { safeAddress: string; rolesModifierAddress: string; roleKey: string; chainId: number }
-  ) => roleDelegationService.set(address, config);
-  clearRoleDelegation = (address: string) => roleDelegationService.clear(address);
+  ) {
+    return roleDelegationService.set(address, config);
+  }
+  clearRoleDelegation(address: string) {
+    return roleDelegationService.clear(address);
+  }
 
-  getKeeperhubWorkflows = async (address: string) => {
+  async getKeeperhubWorkflows(address: string) {
+    const workflows = keeperhubService.getWorkflows(address);
+    // Sync with remote list to ensure names are up-to-date
+    try {
+      const remoteWorkflows = await keeperhubMCPService.listWorkflows();
+      // Update local cache with remote names
+      remoteWorkflows.forEach((remote) => {
+        const local = workflows.find((w) => w.workflowId === remote.id);
+        if (local && local.name !== remote.name) {
+          keeperhubService.updateWorkflowMeta(address, remote.id, { name: remote.name });
+        }
+      });
+    } catch (error) {
+      // If remote fetch fails, return local cache as-is
+      console.error('Failed to sync workflow names from remote:', error);
+    }
     return keeperhubService.getWorkflows(address);
   };
 
-  getKeeperhubWorkflowExecutions = async (
+  async getKeeperhubWorkflowExecutions(
     address: string,
     workflowId: string
-  ) => {
+  ) {
     try {
       const executions = await keeperhubMCPService.listExecutions(workflowId);
 
@@ -7027,54 +7053,40 @@ export class WalletController extends BaseController {
       console.error('Failed to fetch workflow executions:', error);
       return [];
     }
-  };
+  }
 
   // Calls POST https://app.keeperhub.com/api/workflows, then persists the
   // returned workflow id against the current address. Actual monitoring and
   // execution happens on KeeperHub's infrastructure, not in this extension -
   // this call only registers the workflow.
-  createKeeperhubWorkflow = async (params: {
+  async createKeeperhubWorkflow(params: {
     address: string;
     chainId: number;
     type: 'liquidation-shield' | 'yield-harvester' | 'stop-loss' | 'twap';
     name: string;
     nodes: unknown[];
     edges: unknown[];
-  }) => {
-    const apiKey = keeperhubService.getApiKey();
-    if (!apiKey) {
-      throw new Error('KeeperHub API key is not configured');
+  }) {
+    // Enforce per-account uniqueness on create
+    const existing = keeperhubService.getWorkflowByName(params.address, params.name);
+    if (existing) {
+      throw new Error(
+        `A workflow with the name "${params.name}" already exists for this account`
+      );
     }
 
     try {
-      const res = await fetch('https://app.keeperhub.com/api/workflows/create', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: params.name,
-          nodes: params.nodes,
-          edges: params.edges,
-        }),
-        credentials: 'omit',
+      const workflow = await keeperhubMCPService.createWorkflow({
+        name: params.name,
+        nodes: params.nodes as any,
+        edges: params.edges as any,
+        enabled: true,
       });
-
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('KeeperHub API error:', res.status, errorText);
-
-        throw new Error(
-          `KeeperHub workflow creation failed: ${res.status} ${res.statusText}. ${errorText}`
-        );
-      }
-
-      const workflow = await res.json();
 
       keeperhubService.addWorkflow(params.address, {
         workflowId: workflow.id,
         type: params.type,
+        name: params.name,
         address: params.address,
         chainId: params.chainId,
         createdAt: Date.now(),
@@ -7086,51 +7098,108 @@ export class WalletController extends BaseController {
       console.error('KeeperHub workflow creation error:', error);
       throw error;
     }
-  };
+  }
 
   // GET /api/workflows/{id}/executions - refreshed on demand only, never
   // polled from the background (see keeperhub.ts comments on why).
-  refreshKeeperhubWorkflowStatus = async (
+  async refreshKeeperhubWorkflowStatus(
     address: string,
     workflowId: string
-  ) => {
-    const apiKey = keeperhubService.getApiKey();
-    if (!apiKey) {
-      throw new Error('KeeperHub API key is not configured');
-    }
-
-    const res = await fetch(
-      `https://app.keeperhub.com/api/workflows/${workflowId}/executions`,
-      {
-        headers: { Authorization: `Bearer ${apiKey}` },
-        credentials: 'omit',
-      }
-    );
-
-    if (!res.ok) {
+  ) {
+    try {
+      const executions = await keeperhubMCPService.listExecutions(workflowId);
+      keeperhubService.updateWorkflowStatus(address, workflowId, 'active');
+      return executions;
+    } catch (error) {
       keeperhubService.updateWorkflowStatus(address, workflowId, 'error');
-      throw new Error(
-        `KeeperHub status fetch failed: ${res.status} ${res.statusText}`
-      );
+      throw error;
     }
+  }
 
-    const executions = await res.json();
-    keeperhubService.updateWorkflowStatus(address, workflowId, 'active');
-    return executions;
-  };
-
-  removeKeeperhubWorkflow = async (address: string, workflowId: string) => {
-    const apiKey = keeperhubService.getApiKey();
-    if (apiKey) {
+  async removeKeeperhubWorkflow(address: string, workflowId: string) {
+    try {
+      await keeperhubMCPService.deleteWorkflow(workflowId);
+    } catch (error) {
       // best-effort remote delete; local record is removed regardless so the
       // UI never gets stuck on a dead workflow if the API call fails
-      await fetch(`https://app.keeperhub.com/api/workflows/${workflowId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${apiKey}` },
-        credentials: 'omit',
-      }).catch(() => undefined);
+      console.error('Failed to delete workflow from KeeperHub:', error);
     }
     keeperhubService.removeWorkflow(address, workflowId);
+  }
+
+  async updateKeeperhubWorkflow(
+    address: string,
+    workflowId: string,
+    patch: {
+      name?: string;
+      enabled?: boolean;
+      nodes?: MCPWorkflowNode[];
+      edges?: MCPWorkflowEdge[];
+    }
+  ) {
+    // Enforce per-account uniqueness on rename before calling out
+    if (patch.name) {
+      const existing = keeperhubService.getWorkflowByName(address, patch.name);
+      if (existing && existing.workflowId !== workflowId) {
+        throw new Error(
+          `A workflow with the name "${patch.name}" already exists for this account`
+        );
+      }
+    }
+
+    const result = await keeperhubMCPService.updateWorkflow(workflowId, patch);
+
+    if (patch.name || patch.enabled !== undefined) {
+      keeperhubService.updateWorkflowMeta(address, workflowId, {
+        name: patch.name,
+        lastKnownStatus: patch.enabled === false ? 'paused' : undefined,
+      });
+    }
+
+    return result;
+  }
+
+  async deleteKeeperhubWorkflow(address: string, workflowId: string) {
+    await keeperhubMCPService.deleteWorkflow(workflowId);
+    keeperhubService.removeWorkflow(address, workflowId);
+  }
+
+  async proposeWorkflowFromChat(params: {
+    address: string;
+    chainId: number;
+    workflowId?: string;
+    messages: { role: 'user' | 'model'; text: string }[];
+  }) {
+    const currentDefinition = params.workflowId
+      ? await keeperhubMCPService.listWorkflows({}).then((workflows) => {
+          const workflow = workflows.find((w) => w.id === params.workflowId);
+          return workflow
+            ? {
+                name: workflow.name,
+                nodes: workflow.nodes,
+                edges: workflow.edges,
+              }
+            : undefined;
+        })
+      : undefined;
+
+    return aiProviderService.proposeWorkflow({
+      ...params,
+      currentDefinition,
+    });
+  }
+
+  // Gemini API key management
+  setGeminiApiKey = async (key: string) => {
+    await aiProviderService.setGeminiApiKey(key);
+  };
+
+  getGeminiApiKeyStatus = async () => {
+    return aiProviderService.getGeminiApiKeyStatus();
+  };
+
+  clearGeminiApiKey = async () => {
+    await aiProviderService.clearGeminiApiKey();
   };
 
   // MCP-based workflow generation methods
@@ -7483,7 +7552,7 @@ export class WalletController extends BaseController {
   };
 
   // Reads Aave V3 Pool.getUserAccountData(address) on the given chain via the
-  // existing eth_call plumbing. Used by the Smart Automations "discovery"
+  // existing eth_call plumbing. Used by the Automations "discovery"
   // view to show current Health Factor / collateral / debt before the user
   // configures a liquidation-shield automation.
   getAaveUserAccountData = async ({
@@ -7556,7 +7625,7 @@ export class WalletController extends BaseController {
     };
   };
 
-  // Reads ERC20 decimals() on the given chain. Used by the Smart Automations
+  // Reads ERC20 decimals() on the given chain. Used by the Automations
   // consent modal to convert a human-entered approval amount (e.g. "500")
   // into the raw base-unit string a workflow's erc20/approve node needs,
   // and by the Discovery view to read balances for tokens like stETH.

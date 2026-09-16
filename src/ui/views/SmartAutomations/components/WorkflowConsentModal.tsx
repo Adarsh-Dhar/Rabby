@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Button, Input, Checkbox, Alert } from 'antd';
+import { Modal, Button, Input, Checkbox, Alert, Divider } from 'antd';
 
 export interface WorkflowConsentSummary {
   protocol: string;
@@ -8,6 +8,12 @@ export interface WorkflowConsentSummary {
   chain: string;
   tokenSymbol?: string;
   maxAmount?: string;
+}
+
+export interface WorkflowDiff {
+  field: string;
+  before: string;
+  after: string;
 }
 
 interface WorkflowConsentModalProps {
@@ -28,6 +34,8 @@ interface WorkflowConsentModalProps {
   allowUnlimited?: boolean;
   onAllowUnlimitedChange?: (value: boolean) => void;
   amountValid?: boolean;
+  // Diff support for showing what changed in an edit
+  diffs?: WorkflowDiff[];
 }
 
 export const WorkflowConsentModal: React.FC<WorkflowConsentModalProps> = ({
@@ -43,22 +51,51 @@ export const WorkflowConsentModal: React.FC<WorkflowConsentModalProps> = ({
   allowUnlimited = false,
   onAllowUnlimitedChange,
   amountValid = false,
+  diffs,
 }) => {
   const confirmDisabled =
     showApprovalControls && !allowUnlimited && !amountValid;
 
+  const title = diffs && diffs.length > 0 ? `Update ${workflowType}` : `Create ${workflowType}`;
+  const okText = diffs && diffs.length > 0 ? 'Update Automation' : 'Create Automation';
+
   return (
     <Modal
-      title={`Create ${workflowType}`}
+      title={title}
       open={visible}
       onOk={onConfirm}
       onCancel={onCancel}
       confirmLoading={loading}
-      okText="Create Automation"
+      okText={okText}
       cancelText="Cancel"
       okButtonProps={{ disabled: confirmDisabled }}
+      width={560}
     >
       <div className="flex flex-col gap-12 py-8">
+        {/* Show diffs if this is an edit */}
+        {diffs && diffs.length > 0 && (
+          <>
+            <div className="bg-r-blue-light bg-opacity-5 p-12 rounded-8">
+              <div className="text-r-neutral-foot text-12 mb-8">Changes</div>
+              {diffs.map((diff, idx) => (
+                <div key={idx} className="mb-8 last:mb-0">
+                  <div className="text-r-neutral-foot text-12 mb-4">{diff.field}</div>
+                  <div className="flex items-center gap-8">
+                    <span className="text-r-red-default line-through text-14">
+                      {diff.before}
+                    </span>
+                    <span className="text-r-neutral-foot">→</span>
+                    <span className="text-r-green-success text-14">
+                      {diff.after}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <Divider />
+          </>
+        )}
+
         <div>
           <div className="text-r-neutral-foot text-12 mb-4">Protocol</div>
           <div className="text-r-neutral-title text-14">{summary.protocol}</div>

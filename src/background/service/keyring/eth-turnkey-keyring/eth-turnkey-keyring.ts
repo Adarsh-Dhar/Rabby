@@ -1,5 +1,5 @@
 /**
- * Turnkey keyring for Smart Automations.
+ * Turnkey keyring for Automations.
  *
  * This keyring allows Rabby to use Turnkey's TEE-based key custody
  * and policy engine for automation-only keys. Turnkey provides secure

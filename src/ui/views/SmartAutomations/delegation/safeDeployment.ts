@@ -1,5 +1,5 @@
 /**
- * Safe deployment and Roles Modifier attachment for Smart Automations.
+ * Safe deployment and Roles Modifier attachment for Automations.
  *
  * This module provides functions to deploy a Safe, using the existing
  * @safe-global/protocol-kit dependency that Rabby already has for Gnosis

@@ -11,6 +11,7 @@ export interface KeeperhubWorkflowRecord {
   type: KeeperhubWorkflowType;
   address: string;
   chainId: number;
+  name: string;
   createdAt: number;
   // last status fetched from GET /api/workflows/{id}/executions - not polled
   // in the background, only refreshed on demand when the UI is open.
@@ -83,6 +84,12 @@ class KeeperhubService {
     this.store.workflowsByAddress[key] = [...existing, record];
   };
 
+  getWorkflowByName = (address: string, name: string): KeeperhubWorkflowRecord | undefined => {
+    const key = address.toLowerCase();
+    const existing = this.store.workflowsByAddress[key] || [];
+    return existing.find((w) => w.name === name);
+  };
+
   getWorkflows = (address: string): KeeperhubWorkflowRecord[] => {
     return this.store.workflowsByAddress[address.toLowerCase()] || [];
   };
@@ -105,6 +112,25 @@ class KeeperhubService {
     this.store.workflowsByAddress[key] = existing.map((w) =>
       w.workflowId === workflowId ? { ...w, lastKnownStatus: status } : w
     );
+  };
+
+  updateWorkflowMeta = (
+    address: string,
+    workflowId: string,
+    patch: { name?: string; lastKnownStatus?: KeeperhubWorkflowRecord['lastKnownStatus'] }
+  ) => {
+    const key = address.toLowerCase();
+    const existing = this.store.workflowsByAddress[key] || [];
+    this.store.workflowsByAddress[key] = existing.map((w) => {
+      if (w.workflowId === workflowId) {
+        return {
+          ...w,
+          ...(patch.name !== undefined && { name: patch.name }),
+          ...(patch.lastKnownStatus !== undefined && { lastKnownStatus: patch.lastKnownStatus }),
+        };
+      }
+      return w;
+    });
   };
 }
 

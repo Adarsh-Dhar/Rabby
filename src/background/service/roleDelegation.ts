@@ -2,7 +2,7 @@ import { createPersistStore } from 'background/utils';
 
 /**
  * Stores the user's own Safe + Zodiac Roles Modifier configuration for
- * Smart Automations. Rabby never generates or infers these values — the
+ * Automations. Rabby never generates or infers these values — the
  * user deploys the Safe and Roles Modifier themselves (e.g. via
  * app.roles.gnosisguild.org) and pastes the resulting addresses here. See
  * src/ui/views/SmartAutomations/delegation/zodiacRoles.ts for what this

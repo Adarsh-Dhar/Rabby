@@ -644,7 +644,7 @@ const KeeperhubModal = ({
           />
         </Form.Item>
         <div className="text-13 text-r-neutral-body mb-16">
-          Connect your KeeperHub API key to enable smart automations like
+          Connect your KeeperHub API key to enable Automations like
           liquidation shields and yield harvesters.
         </div>
         <div className="flex justify-center mt-24 popup-footer">

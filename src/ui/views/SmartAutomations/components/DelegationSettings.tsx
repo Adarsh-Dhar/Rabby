@@ -57,7 +57,7 @@ function makeEip1193Provider(wallet: any, chainServerId: string): Eip1193Provide
 }
 
 /**
- * Lets the user opt Smart Automations into executing through a Safe +
+ * Lets the user opt Automations into executing through a Safe +
  * Zodiac Roles Modifier they've already deployed, instead of executing
  * directly with a plain EOA and MAX_UINT256-or-nothing approvals.
  *

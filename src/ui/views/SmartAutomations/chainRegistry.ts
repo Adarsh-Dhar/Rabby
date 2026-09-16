@@ -1,5 +1,5 @@
 /**
- * Multi-chain contract registry for Smart Automations.
+ * Multi-chain contract registry for Automations.
  *
  * WHY THIS EXISTS: workflowTemplates.ts, usePositions.ts, and home.tsx were
  * all hardcoding `network: '1'` / `chainId: 1`. That's not a real multi-chain
@@ -17,7 +17,7 @@
  * so a half-filled-in row can't silently ship.
  */
 
-export type SupportedChainKey = 'ethereum' | 'base' | 'arbitrum';
+export type SupportedChainKey = 'ethereum' | 'ethereum-sepolia' | 'base' | 'arbitrum';
 
 export interface ChainContracts {
   chainId: number;
@@ -50,6 +50,17 @@ export const CHAIN_REGISTRY: Record<SupportedChainKey, ChainContracts> = {
     verified: true,
     verifiedAgainst:
       'Etherscan verified-source pages, cross-checked against Aave/Spark/Lido official docs',
+  },
+  'ethereum-sepolia': {
+    chainId: 11155111,
+    network: '11155111',
+    label: 'Ethereum Sepolia',
+    serverId: 'sepolia',
+    aaveV3Pool: '0x6Ae43d3278cC1f828cBef81b3FaE6D5aC7a089D0', // VERIFY: cross-check against Aave V3 Sepolia docs
+    usdc: '0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238', // VERIFY: cross-check against Circle's official contract list
+    uniswapV3Router: '0x3fC91A3afd70395Cd4963868e85F0694D1c7597B', // VERIFY: cross-check against Uniswap official docs
+    verified: false,
+    verifiedAgainst: undefined, // Must verify all addresses against official protocol docs before setting verified: true
   },
   base: {
     chainId: 8453,

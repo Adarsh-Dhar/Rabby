@@ -623,8 +623,8 @@ export const DashboardPanel: React.FC<{ onSettingClick?(): void }> = ({
     } as IPanelItem,
     smartAutomations: {
       icon: RcIconLampCC,
-      eventKey: 'Smart Automations',
-      content: 'Smart Automations',
+      eventKey: 'Automations',
+      content: 'Automations',
       onClick: () => {
         history.push('/smart-automations');
       },

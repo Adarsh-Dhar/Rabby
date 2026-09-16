@@ -1,12 +1,12 @@
 /**
- * Zodiac Roles Modifier integration for Smart Automations.
+ * Zodiac Roles Modifier integration for Automations.
  *
  * WHAT THIS IS AND ISN'T:
  * This module does NOT deploy a Safe, does NOT deploy a Roles Modifier, and
  * does NOT define permissions. All of that has to happen first, outside of
  * Rabby, using the Zodiac Roles app (https://app.roles.gnosisguild.org) or
  * the zodiac-roles-sdk directly. What this module does is take a
- * transaction Smart Automations already built (to/value/data) and wrap it
+ * transaction Automations already built (to/value/data) and wrap it
  * in an `execTransactionWithRole` call, so that when the automation fires,
  * it executes AS the role — meaning it can only do what the role's
  * on-chain permissions already allow, no matter what the automation's
@@ -28,7 +28,7 @@
  *   4. Assign the role to a member address — this can be a fresh Rabby
  *      account dedicated to automations, so it never touches your main key.
  *   5. Paste the Safe address, Roles Modifier address, and role key into
- *      Smart Automations settings (see DelegationSettings.tsx).
+ *      Automations settings (see DelegationSettings.tsx).
  *
  * Rabby cannot safely do steps 1-4 for you: doing so would mean either
  * fabricating contract addresses (fund-loss risk if wrong) or silently
