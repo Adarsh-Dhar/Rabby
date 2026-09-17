@@ -52,7 +52,7 @@ import {
   RcIconTransactionsCC,
   RcIconConvertDustCC,
   RcIconStakingCC,
-  RcIconLampCC,
+  RcIconAutomationCC,
 } from 'ui/assets/dashboard/panel';
 
 import { useThemeMode } from '@/ui/hooks/usePreference';
@@ -622,16 +622,15 @@ export const DashboardPanel: React.FC<{ onSettingClick?(): void }> = ({
       // isFullscreen: true,
     } as IPanelItem,
     smartAutomations: {
-      icon: RcIconLampCC,
+      icon: RcIconAutomationCC,
       eventKey: 'Automations',
       content: 'Automations',
       onClick: () => {
-        openInTab('desktop.html#/desktop/smart-automations', true);
+        history.push('/smart-automations');
       },
       onOpenInDesktop: () => {
         openPanelInDesktop('/desktop/smart-automations');
       },
-      isFullscreen: true,
     } as IPanelItem,
     searchDapp: {
       icon: RcIconSearchCC,

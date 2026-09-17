@@ -17,6 +17,6 @@ export { ReactComponent as RcIconDappsCC } from './dapps-cc.svg';
 export { ReactComponent as RcIconManageCC } from './address-manage-cc.svg';
 export { ReactComponent as RcIconSettingCC } from './setting-cc.svg';
 
-export { ReactComponent as RcIconLampCC } from './lamp-cc.svg';
+export { ReactComponent as RcIconAutomationCC } from './automation-cc.svg';
 export { ReactComponent as RcIconStakingCC } from './staking-cc.svg';
 export { ReactComponent as RcIconConvertDustCC } from './convert-dust-cc.svg';
