@@ -188,18 +188,23 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
       </div>
 
       {/* Nodes */}
-      <div className="bg-r-neutral-card rounded-8 p-16">
+      <div className="bg-r-neutral-card rounded-8 p-16 border border-r-neutral-line">
         <div className="flex items-center justify-between mb-12">
-          <div className="text-r-neutral-title text-14 font-medium">
-            Nodes ({definition.nodes.length})
+          <div>
+            <div className="text-r-neutral-title text-14 font-medium">
+              Nodes
+            </div>
+            <div className="text-r-neutral-foot text-12 mt-4">
+              {definition.nodes.length} {definition.nodes.length === 1 ? 'step' : 'steps'} in this workflow
+            </div>
           </div>
           <Button
-            type="text"
+            type="primary"
             size="small"
             icon={<ThemeIcon src={RcIconPlus} className="w-14 h-14" />}
             onClick={addNode}
           >
-            Add Node
+            Add node
           </Button>
         </div>
         <div className="flex flex-col gap-12">
