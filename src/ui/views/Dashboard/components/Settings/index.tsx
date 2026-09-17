@@ -668,6 +668,82 @@ const KeeperhubModal = ({
   );
 };
 
+const GeminiModal = ({
+  visible,
+  onFinish,
+  onCancel,
+}: {
+  visible: boolean;
+  onFinish(): void;
+  onCancel(): void;
+}) => {
+  const { useForm } = Form;
+  const [isVisible, setIsVisible] = useState(false);
+  const [form] = useForm<{ apiKey: string }>();
+  const wallet = useWallet();
+  const { t } = useTranslation();
+
+  const handleSubmit = async ({ apiKey }: { apiKey: string }) => {
+    try {
+      await wallet.setGeminiApiKey(apiKey);
+      setIsVisible(false);
+      setTimeout(onFinish, 500);
+    } catch (error) {
+      message.error(
+        (error as Error)?.message || 'Failed to set Gemini API key'
+      );
+    }
+  };
+
+  const handleCancel = () => {
+    setIsVisible(false);
+    setTimeout(onCancel, 500);
+  };
+
+  useEffect(() => {
+    setTimeout(() => setIsVisible(visible), 100);
+  }, [visible]);
+
+  return (
+    <div
+      className={clsx('openapi-modal', { show: isVisible, hidden: !visible })}
+    >
+      <PageHeader forceShowBack onBack={handleCancel}>
+        Gemini API Key
+      </PageHeader>
+      <Form onFinish={handleSubmit} form={form}>
+        <Form.Item
+          name="apiKey"
+          rules={[
+            { required: true, message: 'Please enter your Gemini API key' },
+          ]}
+        >
+          <Input
+            className="popup-input"
+            placeholder="Enter your Gemini API key"
+            size="large"
+            autoFocus
+            spellCheck={false}
+          />
+        </Form.Item>
+        <div className="text-13 text-r-neutral-body mb-16">
+          Store the key securely for Gemini-powered workflow assistance.
+        </div>
+        <div className="flex justify-center mt-24 popup-footer">
+          <Button
+            type="primary"
+            size="large"
+            htmlType="submit"
+            className="w-[200px]"
+          >
+            {t('page.dashboard.settings.save')}
+          </Button>
+        </div>
+      </Form>
+    </div>
+  );
+};
+
 // const ClaimRabbyBadge = ({ onClick }: { onClick: () => void }) => {
 //   const { t } = useTranslation();
 //   return (
@@ -731,6 +807,8 @@ const SettingsInner = ({
   const [dataAnalysisPending, setDataAnalysisPending] = useState(false);
   const [showKeeperhubModal, setShowKeeperhubModal] = useState(false);
   const [keeperhubApiKey, setKeeperhubApiKey] = useState('');
+  const [showGeminiModal, setShowGeminiModal] = useState(false);
+  const [geminiApiKey, setGeminiApiKey] = useState('');
 
   const [perpsIncludeWatchForTest, setPerpsIncludeWatchForTest] = useState(
     () => localStorage.getItem(PERPS_TEST_INCLUDE_WATCH_KEY) === '1'
@@ -908,6 +986,11 @@ const SettingsInner = ({
       }
     };
     loadKeeperhubStatus();
+    const loadGeminiStatus = async () => {
+      const hasKey = await wallet.getGeminiApiKeyStatus();
+      setGeminiApiKey(hasKey ? '••••••••••••' : '');
+    };
+    loadGeminiStatus();
   }, [wallet]);
 
   const { value: hasNewVersion = false } = useAsync(async () => {
@@ -1217,6 +1300,26 @@ const SettingsInner = ({
             </>
           ),
           onClick: () => setShowKeeperhubModal(true),
+        },
+        {
+          leftIcon: RcIconPerps,
+          leftIconClassName: 'text-r-neutral-body',
+          content: 'Gemini API Key',
+          rightIcon: (
+            <>
+              <span
+                className="text-14 mr-[8px] text-r-neutral-foot"
+                role="button"
+              >
+                {geminiApiKey || 'Not connected'}
+              </span>
+              <ThemeIcon
+                src={RcIconArrowRight}
+                className="icon icon-arrow-right"
+              />
+            </>
+          ),
+          onClick: () => setShowGeminiModal(true),
         },
         {
           leftIcon: RcIconCustomTestnet,
@@ -1890,6 +1993,15 @@ const SettingsInner = ({
           loadKeeperhubStatus();
         }}
         onCancel={() => setShowKeeperhubModal(false)}
+      />
+      <GeminiModal
+        visible={showGeminiModal}
+        onFinish={async () => {
+          setShowGeminiModal(false);
+          const hasKey = await wallet.getGeminiApiKeyStatus();
+          setGeminiApiKey(hasKey ? '••••••••••••' : '');
+        }}
+        onCancel={() => setShowGeminiModal(false)}
       />
       <CurrencyModal
         visible={isShowCurrencyModal}

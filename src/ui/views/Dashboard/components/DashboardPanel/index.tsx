@@ -626,12 +626,11 @@ export const DashboardPanel: React.FC<{ onSettingClick?(): void }> = ({
       eventKey: 'Automations',
       content: 'Automations',
       onClick: () => {
-        openInTab('desktop.html#/desktop/smart-automations', true);
+        history.push('/smart-automations');
       },
       onOpenInDesktop: () => {
         openPanelInDesktop('/desktop/smart-automations');
       },
-      isFullscreen: true,
     } as IPanelItem,
     searchDapp: {
       icon: RcIconSearchCC,
