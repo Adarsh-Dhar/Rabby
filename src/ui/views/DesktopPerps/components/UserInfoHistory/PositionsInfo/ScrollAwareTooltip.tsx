@@ -134,7 +134,7 @@ export const ScrollAwareTooltip: React.FC<
       : false;
 
   return (
-    <Tooltip {...restProps} visible={finalVisible} ref={tooltipRef}>
+    <Tooltip {...restProps} open={finalVisible} ref={tooltipRef}>
       <span ref={setChildrenRef}>{children}</span>
     </Tooltip>
   );

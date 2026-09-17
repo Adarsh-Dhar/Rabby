@@ -5,22 +5,24 @@ import { ReactComponent as RcIconCheck } from 'ui/assets/check.svg';
 import ThemeIcon from '@/ui/component/ThemeMode/ThemeIcon';
 import { useWallet } from '@/ui/utils';
 import { useCurrentAccount } from '@/ui/hooks/backgroundState/useAccount';
-import type { MCPWorkflowNode, MCPWorkflowEdge } from 'background/service/keeperhubMCP';
 import { ChatPane } from './ChatPane';
 import { FormPane } from './FormPane';
-import { WorkflowConsentModal, type WorkflowConsentSummary } from '../WorkflowConsentModal';
+import { WorkflowConsentModal } from '../WorkflowConsentModal';
+import type { WorkflowConsentSummary } from '../WorkflowConsentModal';
 import { scopeApproveNodeAmounts, MAX_UINT256 } from '../../workflowTemplates';
 import { applyRoleDelegation } from '../../delegation/zodiacRoles';
 
 interface ProjectEditorProps {
   workflowId?: string; // undefined = new project
   initialName?: string;
-  initialNodes?: MCPWorkflowNode[];
-  initialEdges?: MCPWorkflowEdge[];
+  initialDescription?: string;
+  initialNodes?: WorkflowNode[];
+  initialEdges?: WorkflowEdge[];
   onSave: (params: {
     name: string;
-    nodes: MCPWorkflowNode[];
-    edges: MCPWorkflowEdge[];
+    description?: string;
+    nodes: WorkflowNode[];
+    edges: WorkflowEdge[];
   }) => Promise<void>;
   onCancel: () => void;
   chainId: number;
@@ -28,10 +30,38 @@ interface ProjectEditorProps {
 
 type EditorMode = 'chat' | 'form';
 
-interface DraftDefinition {
+interface NodeData {
+  label?: string;
+  type?: string;
+  description?: string;
+  config?: {
+    actionType?: string;
+    contractAddress?: string;
+    functionName?: string;
+    functionArgs?: string;
+    triggerType?: string;
+    [key: string]: unknown;
+  };
+}
+
+interface WorkflowNode {
+  id: string;
+  type: 'trigger' | 'action' | 'condition';
+  data: NodeData;
+  position?: { x: number; y: number };
+}
+
+interface WorkflowEdge {
+  id: string;
+  source: string;
+  target: string;
+}
+
+export interface DraftDefinition {
   name: string;
-  nodes: MCPWorkflowNode[];
-  edges: MCPWorkflowEdge[];
+  description?: string;
+  nodes: WorkflowNode[];
+  edges: WorkflowEdge[];
 }
 
 interface Fingerprint {
@@ -43,6 +73,7 @@ interface Fingerprint {
 export const ProjectEditor: React.FC<ProjectEditorProps> = ({
   workflowId,
   initialName = '',
+  initialDescription,
   initialNodes = [],
   initialEdges = [],
   onSave,
@@ -54,40 +85,57 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
   const [mode, setMode] = useState<EditorMode>('chat');
   const [draftDefinition, setDraftDefinition] = useState<DraftDefinition>({
     name: initialName,
+    description: initialDescription,
     nodes: initialNodes,
     edges: initialEdges,
   });
-  const [liveFingerprint, setLiveFingerprint] = useState<Fingerprint | null>(null);
-  const [pendingProposal, setPendingProposal] = useState<DraftDefinition | null>(null);
+  const [liveFingerprint, setLiveFingerprint] = useState<Fingerprint | null>(
+    null
+  );
+  const [
+    pendingProposal,
+    setPendingProposal,
+  ] = useState<DraftDefinition | null>(null);
   const [loading, setLoading] = useState(false);
-  const [chatMessages, setChatMessages] = useState<{ role: 'user' | 'model'; text: string }[]>([]);
+  const [chatMessages, setChatMessages] = useState<
+    { role: 'user' | 'model'; text: string }[]
+  >([]);
   const [showConsent, setShowConsent] = useState(false);
 
   // Approval-scoping state
   const [rawAmount, setRawAmount] = useState('');
   const [allowUnlimited, setAllowUnlimited] = useState(false);
-  const [pendingApproveToken, setPendingApproveToken] = useState<string | undefined>(undefined);
-  const [pendingApproveDecimals, setPendingApproveDecimals] = useState<number | null>(null);
+  const [pendingApproveToken, setPendingApproveToken] = useState<
+    string | undefined
+  >(undefined);
+  const [pendingApproveDecimals, setPendingApproveDecimals] = useState<
+    number | null
+  >(null);
 
   // Compute fingerprint of a definition
-  const computeFingerprint = useCallback((def: DraftDefinition): Fingerprint => {
-    const nodesHash = JSON.stringify(def.nodes);
-    const edgesHash = JSON.stringify(def.edges);
-    return {
-      name: def.name,
-      nodesHash,
-      edgesHash,
-    };
-  }, []);
+  const computeFingerprint = useCallback(
+    (def: DraftDefinition): Fingerprint => {
+      const nodesHash = JSON.stringify(def.nodes);
+      const edgesHash = JSON.stringify(def.edges);
+      return {
+        name: def.name,
+        nodesHash,
+        edgesHash,
+      };
+    },
+    []
+  );
 
   // Initialize fingerprint when component mounts or initial data changes
   useEffect(() => {
     if (initialName || initialNodes.length > 0 || initialEdges.length > 0) {
-      setLiveFingerprint(computeFingerprint({
-        name: initialName,
-        nodes: initialNodes,
-        edges: initialEdges,
-      }));
+      setLiveFingerprint(
+        computeFingerprint({
+          name: initialName,
+          nodes: initialNodes,
+          edges: initialEdges,
+        })
+      );
     }
   }, [initialName, initialNodes, initialEdges, computeFingerprint]);
 
@@ -125,8 +173,16 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
         const config = node.data?.config;
         if (!config) return true;
         // Only recognize known action types
-        const knownActionTypes = ['web3/read-contract', 'web3/write-contract', 'Condition'];
-        if (config.actionType && !knownActionTypes.includes(config.actionType)) {
+        const knownActionTypes = [
+          'web3/read-contract',
+          'web3/write-contract',
+          'Condition',
+        ];
+        if (
+          config.actionType &&
+          typeof config.actionType === 'string' &&
+          !knownActionTypes.includes(config.actionType)
+        ) {
           return true;
         }
         return false;
@@ -135,7 +191,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
       if (unrecognizedNodes.length > 0) {
         message.error(
           `Workflow contains ${unrecognizedNodes.length} unrecognized node type(s). ` +
-          'Please use only supported node types (web3/read-contract, web3/write-contract, Condition).'
+            'Please use only supported node types (web3/read-contract, web3/write-contract, Condition).'
         );
         return;
       }
@@ -149,7 +205,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
           if (pendingApproveDecimals === null) {
             message.error(
               'Could not determine token decimals — cannot safely scope the approval amount. ' +
-              'Try again, or check "allow unlimited" if you understand the risk.'
+                'Try again, or check "allow unlimited" if you understand the risk.'
             );
             return;
           }
@@ -157,7 +213,10 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
           const { parseUnits } = await import('viem');
           let scopedAmount: string;
           try {
-            scopedAmount = parseUnits(rawAmount as `${number}`, pendingApproveDecimals).toString();
+            scopedAmount = parseUnits(
+              rawAmount as `${number}`,
+              pendingApproveDecimals
+            ).toString();
           } catch {
             message.error('Enter a valid amount');
             return;
@@ -170,7 +229,10 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
       try {
         const roleDelegation = await wallet.getRoleDelegation(account.address);
         if (roleDelegation) {
-          nodesToSubmit = applyRoleDelegation(nodesToSubmit as any, roleDelegation) as any;
+          nodesToSubmit = applyRoleDelegation(
+            nodesToSubmit as any,
+            roleDelegation
+          ) as any;
         }
       } catch (delegationError) {
         console.error('Failed to get role delegation:', delegationError);
@@ -194,6 +256,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
 
       await onSave({
         name: draftDefinition.name,
+        description: draftDefinition.description,
         nodes: nodesToSubmit,
         edges: draftDefinition.edges,
       });
@@ -223,7 +286,10 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
     // Check if there are any approve nodes that need scoping
     const approveNodes = draftDefinition.nodes.filter((node) => {
       const config = node.data?.config;
-      return config?.functionName === 'approve' && config?.actionType === 'web3/write-contract';
+      return (
+        config?.functionName === 'approve' &&
+        config?.actionType === 'web3/write-contract'
+      );
     });
 
     if (approveNodes.length > 0) {
@@ -232,7 +298,10 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
       const config = firstApprove.data?.config;
       let approveToken: string | undefined;
       try {
-        const args = JSON.parse(config?.functionArgs || '[]');
+        const functionArgs = config?.functionArgs;
+        const args = JSON.parse(
+          typeof functionArgs === 'string' ? functionArgs : '[]'
+        );
         approveToken = args[0] as string;
       } catch {
         // Could not parse args
@@ -241,15 +310,18 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
       setPendingApproveToken(approveToken);
       if (approveToken) {
         // Fetch token decimals
-        wallet.getErc20DecimalsAndBalance({
-          address: account?.address || '',
-          tokenAddress: approveToken,
-          chainId,
-        }).then(({ decimals }) => {
-          setPendingApproveDecimals(decimals);
-        }).catch(() => {
-          setPendingApproveDecimals(null);
-        });
+        wallet
+          .getErc20DecimalsAndBalance({
+            address: account?.address || '',
+            tokenAddress: approveToken,
+            chainId,
+          })
+          .then(({ decimals }) => {
+            setPendingApproveDecimals(decimals);
+          })
+          .catch(() => {
+            setPendingApproveDecimals(null);
+          });
       }
     }
 
@@ -274,7 +346,9 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
     const contractAddresses = new Set<string>();
     actions.forEach((node) => {
       const address = node.data?.config?.contractAddress;
-      if (address) contractAddresses.add(address);
+      if (address && typeof address === 'string') {
+        contractAddresses.add(address);
+      }
     });
 
     // Map known addresses to protocols
@@ -287,8 +361,12 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
       .map((addr) => protocolMap[addr] || addr.slice(0, 8))
       .join(', ');
 
-    const triggerTypes = triggers.map((t) => t.data?.config?.triggerType || 'Manual').join(', ');
-    const actionTypes = actions.map((a) => a.data?.label || a.data?.type).join(', ');
+    const triggerTypes = triggers
+      .map((t) => t.data?.config?.triggerType || 'Manual')
+      .join(', ');
+    const actionTypes = actions
+      .map((a) => a.data?.label || a.data?.type)
+      .join(', ');
 
     return {
       protocol: protocols || 'Multiple protocols',
@@ -302,7 +380,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
 
   if (loading && !draftDefinition.name) {
     return (
-      <div className="flex items-center justify-center h-400">
+      <div className="flex items-center justify-center h-96">
         <Spin size="large" />
       </div>
     );
@@ -311,22 +389,29 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
   return (
     <div className="flex min-h-0 flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-16 py-12 border-b border-r-neutral-line">
+      <div className="flex items-center justify-between px-16 py-12 border-b border-r-neutral-line flex-shrink-0">
         <div className="flex items-center gap-12">
-          <h2 className="text-r-neutral-title text-18 font-medium">
+          <h2 className="text-r-neutral-title text-16 font-medium">
             {workflowId ? 'Edit Workflow' : 'New Workflow'}
           </h2>
         </div>
         <div className="flex items-center gap-8">
           <Button
             type="primary"
+            size="small"
             icon={<ThemeIcon src={RcIconCheck} className="w-14 h-14" />}
             onClick={handleConfirmSave}
-            disabled={!draftDefinition.name || draftDefinition.nodes.length === 0}
+            disabled={
+              !draftDefinition.name || draftDefinition.nodes.length === 0
+            }
           >
             Save
           </Button>
-          <Button icon={<ThemeIcon src={RcIconClose} className="w-14 h-14" />} onClick={onCancel}>
+          <Button
+            size="small"
+            icon={<ThemeIcon src={RcIconClose} className="w-14 h-14" />}
+            onClick={onCancel}
+          >
             Cancel
           </Button>
         </div>
@@ -337,7 +422,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
         <Tabs
           className="flex h-full min-h-0 w-full flex-col"
           activeKey={mode}
-          onChange={setMode}
+          onChange={(key) => setMode(key as EditorMode)}
           items={[
             {
               key: 'chat',

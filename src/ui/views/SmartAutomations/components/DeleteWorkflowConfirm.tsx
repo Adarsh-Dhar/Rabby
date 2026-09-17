@@ -44,15 +44,17 @@ export const DeleteWorkflowConfirm: React.FC<DeleteWorkflowConfirmProps> = ({
         />
 
         <div>
-          <div className="text-r-neutral-foot text-12 mb-4">Workflow to delete</div>
+          <div className="text-r-neutral-foot text-12 mb-4">
+            Workflow to delete
+          </div>
           <div className="text-r-neutral-title text-14 font-medium">
             {workflowName}
           </div>
         </div>
 
         <div className="text-r-neutral-foot text-12">
-          Any pending executions will be cancelled. You will need to recreate this workflow
-          if you want to use it again in the future.
+          Any pending executions will be cancelled. You will need to recreate
+          this workflow if you want to use it again in the future.
         </div>
       </div>
     </Modal>

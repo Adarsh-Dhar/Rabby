@@ -345,7 +345,7 @@ export const PositionSizeInputAndSlider: React.FC<PositionSizeInputAndSliderProp
             onChange={handleSliderChange}
             step={1}
             marks={SLIDER_MARKS}
-            tooltipVisible={false}
+            tooltip={{ open: false }}
           />
           {/* Preset Points */}
           <div className="relative ml-2">

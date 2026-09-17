@@ -576,7 +576,7 @@ const LpPercentActionContentInner = ({
           max={100}
           step={1}
           value={percent}
-          tooltipVisible={false}
+          tooltip={{ open: false }}
           onChange={(value) => onPercentChange(Number(value))}
         />
         <div className="staking-lp-presets">

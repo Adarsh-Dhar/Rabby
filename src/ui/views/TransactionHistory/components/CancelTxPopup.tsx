@@ -109,7 +109,7 @@ export const CancelTxPopup = ({ visible, onClose, onCancelTx, tx }: Props) => {
     <>
       <Popup
         title={t('page.activities.signedTx.CancelTxPopup.title')}
-        visible={visible}
+        open={visible}
         onClose={onClose}
         closable
         height={232}

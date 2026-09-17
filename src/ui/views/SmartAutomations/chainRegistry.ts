@@ -17,7 +17,11 @@
  * so a half-filled-in row can't silently ship.
  */
 
-export type SupportedChainKey = 'ethereum' | 'ethereum-sepolia' | 'base' | 'arbitrum';
+export type SupportedChainKey =
+  | 'ethereum'
+  | 'ethereum-sepolia'
+  | 'base'
+  | 'arbitrum';
 
 export interface ChainContracts {
   chainId: number;
@@ -90,7 +94,7 @@ export class UnverifiedChainError extends Error {
   constructor(chain: string) {
     super(
       `Chain "${chain}" is not marked verified in chainRegistry.ts. Refusing to build` +
-        ` a workflow against it — add real, verified contract addresses first.`
+        ' a workflow against it — add real, verified contract addresses first.'
     );
     this.name = 'UnverifiedChainError';
   }

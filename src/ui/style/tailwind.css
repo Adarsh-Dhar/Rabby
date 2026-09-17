@@ -8,4 +8,16 @@
   [role='button']:not(:disabled):not([aria-disabled='true']) {
     cursor: pointer;
   }
+
+  /* Prevent Tailwind from breaking Ant Design Button text positioning */
+  .ant-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .ant-btn > span {
+    display: inline-flex;
+    align-items: center;
+  }
 }

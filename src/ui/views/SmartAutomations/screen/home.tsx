@@ -1,52 +1,72 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { PageHeader } from '@/ui/component';
 import { useWallet } from '@/ui/utils';
 import { useCurrentAccount } from '@/ui/hooks/backgroundState/useAccount';
 import { Button, message, Select, Row, Col } from 'antd';
 import { ReactComponent as RcIconPlus } from 'ui/assets/plus.svg';
 import ThemeIcon from '@/ui/component/ThemeMode/ThemeIcon';
-import { findChain } from '@/utils/chain';
-import { listVerifiedChains, type ChainContracts } from '../chainRegistry';
-import { ProjectCard, type WorkflowRow } from '../components/ProjectCard';
+import { listVerifiedChains } from '../chainRegistry';
+import type { ChainContracts } from '../chainRegistry';
+import { ProjectCard } from '../components/ProjectCard';
+import type { WorkflowRow } from '../components/ProjectCard';
 import { ProjectEditor } from '../components/ProjectEditor';
-import { DelegationSettings, type DelegationSettingsValue } from '../components/DelegationSettings';
+import { DelegationSettings } from '../components/DelegationSettings';
+import type { DelegationSettingsValue } from '../components/DelegationSettings';
 import { useAaveHealthFactor } from '../hooks/useAaveHealthFactor';
-import type { MCPWorkflowNode, MCPWorkflowEdge } from 'background/service/keeperhubMCP';
 
 const SmartAutomations = () => {
   const wallet = useWallet();
   const account = useCurrentAccount();
   const [workflows, setWorkflows] = useState<WorkflowRow[]>([]);
   const [hasApiKey, setHasApiKey] = useState(false);
-  const [selectedChain, setSelectedChain] = useState<ChainContracts | null>(null);
-  const [editingWorkflowId, setEditingWorkflowId] = useState<string | undefined>(undefined);
+  const [selectedChain, setSelectedChain] = useState<ChainContracts | null>(
+    null
+  );
+  const [editingWorkflowId, setEditingWorkflowId] = useState<
+    string | undefined
+  >(undefined);
   const [showEditor, setShowEditor] = useState(false);
 
   // Delegation settings state
   const [showDelegationSettings, setShowDelegationSettings] = useState(false);
   const [delegationLoading, setDelegationLoading] = useState(false);
-  const [roleDelegation, setRoleDelegation] = useState<DelegationSettingsValue | null>(null);
+  const [
+    roleDelegation,
+    setRoleDelegation,
+  ] = useState<DelegationSettingsValue | null>(null);
 
   const healthFactorData = useAaveHealthFactor(account?.address);
 
   const load = useCallback(async () => {
     if (!account?.address) return;
-    const [keyStatus, list, delegation] = await Promise.all([
-      wallet.getKeeperhubApiKeyStatus(),
-      wallet.getKeeperhubWorkflows(account.address),
-      wallet.getRoleDelegation(account.address),
-    ]);
-    setHasApiKey(keyStatus);
-    setWorkflows(list);
-    if (delegation) {
-      setRoleDelegation({
-        safeAddress: delegation.safeAddress,
-        rolesModifierAddress: delegation.rolesModifierAddress,
-        roleKey: delegation.roleKey,
-        chainId: delegation.chainId,
+    try {
+      console.log('Loading automations data for account:', account.address);
+      const [keyStatus, list, delegation] = await Promise.all([
+        wallet.getKeeperhubApiKeyStatus(),
+        wallet.getKeeperhubWorkflows(account.address),
+        wallet.getRoleDelegation(account.address),
+      ]);
+      console.log('Automations data loaded:', {
+        keyStatus,
+        listLength: list.length,
+        hasDelegation: !!delegation,
       });
-    } else {
-      setRoleDelegation(null);
+      setHasApiKey(keyStatus);
+      setWorkflows(list);
+      if (delegation) {
+        setRoleDelegation({
+          safeAddress: delegation.safeAddress,
+          rolesModifierAddress: delegation.rolesModifierAddress,
+          roleKey: delegation.roleKey,
+          chainId: delegation.chainId,
+        });
+      } else {
+        setRoleDelegation(null);
+      }
+    } catch (error) {
+      console.error('Failed to load automations data:', error);
+      // Set hasApiKey to false on error to prevent UI from breaking
+      setHasApiKey(false);
     }
   }, [wallet, account?.address]);
 
@@ -72,56 +92,74 @@ const SmartAutomations = () => {
     setShowEditor(true);
   }, []);
 
-  const handleDeleteWorkflow = useCallback(async (workflowId: string) => {
-    if (!account?.address) return;
-    try {
-      await wallet.deleteKeeperhubWorkflow(account.address, workflowId);
+  const handleDeleteWorkflow = useCallback(
+    async (workflowId: string) => {
+      if (!account?.address) return;
+      try {
+        await wallet.deleteKeeperhubWorkflow(account.address, workflowId);
+        await load();
+      } catch (error) {
+        message.error((error as Error).message);
+      }
+    },
+    [account?.address, wallet, load]
+  );
+
+  const handleToggleWorkflow = useCallback(
+    async (workflowId: string, enabled: boolean) => {
+      if (!account?.address) return;
+      try {
+        await wallet.updateKeeperhubWorkflow(account.address, workflowId, {
+          enabled,
+        });
+        await load();
+      } catch (error) {
+        message.error((error as Error).message);
+      }
+    },
+    [account?.address, wallet, load]
+  );
+
+  const handleSaveWorkflow = useCallback(
+    async (params: {
+      name: string;
+      description?: string;
+      nodes: any[];
+      edges: any[];
+    }) => {
+      if (!account?.address) return;
+
+      if (editingWorkflowId) {
+        // Update existing workflow
+        await wallet.updateKeeperhubWorkflow(
+          account.address,
+          editingWorkflowId,
+          {
+            name: params.name,
+            description: params.description,
+            nodes: params.nodes,
+            edges: params.edges,
+          }
+        );
+      } else {
+        // Create new workflow
+        await wallet.createKeeperhubWorkflow({
+          address: account.address,
+          chainId: selectedChain?.chainId ?? 1,
+          type: 'twap', // Use a supported workflow type
+          name: params.name,
+          description: params.description,
+          nodes: params.nodes,
+          edges: params.edges,
+        });
+      }
+
       await load();
-    } catch (error) {
-      message.error((error as Error).message);
-    }
-  }, [account?.address, wallet, load]);
-
-  const handleToggleWorkflow = useCallback(async (workflowId: string, enabled: boolean) => {
-    if (!account?.address) return;
-    try {
-      await wallet.updateKeeperhubWorkflow(account.address, workflowId, { enabled });
-      await load();
-    } catch (error) {
-      message.error((error as Error).message);
-    }
-  }, [account?.address, wallet, load]);
-
-  const handleSaveWorkflow = useCallback(async (params: {
-    name: string;
-    nodes: MCPWorkflowNode[];
-    edges: MCPWorkflowEdge[];
-  }) => {
-    if (!account?.address) return;
-
-    if (editingWorkflowId) {
-      // Update existing workflow
-      await wallet.updateKeeperhubWorkflow(account.address, editingWorkflowId, {
-        name: params.name,
-        nodes: params.nodes,
-        edges: params.edges,
-      });
-    } else {
-      // Create new workflow
-      await wallet.createKeeperhubWorkflow({
-        address: account.address,
-        chainId: selectedChain?.chainId ?? 1,
-        type: 'custom', // Chat-generated workflows are custom type
-        name: params.name,
-        nodes: params.nodes,
-        edges: params.edges,
-      });
-    }
-
-    await load();
-    setShowEditor(false);
-    setEditingWorkflowId(undefined);
-  }, [account?.address, editingWorkflowId, selectedChain, wallet, load]);
+      setShowEditor(false);
+      setEditingWorkflowId(undefined);
+    },
+    [account?.address, editingWorkflowId, selectedChain, wallet, load]
+  );
 
   const handleCancelEditor = useCallback(() => {
     setShowEditor(false);
@@ -132,10 +170,10 @@ const SmartAutomations = () => {
     return (
       <div className="p-20">
         <PageHeader canBack={false}>Automations</PageHeader>
-        <p className="text-r-neutral-body">
+        <div className="text-r-neutral-body text-14 mt-16">
           Connect a KeeperHub API key in Settings to enable automations for this
           account.
-        </p>
+        </div>
       </div>
     );
   }
@@ -149,6 +187,7 @@ const SmartAutomations = () => {
       <ProjectEditor
         workflowId={editingWorkflowId}
         initialName={editingWorkflow?.name}
+        initialDescription={editingWorkflow?.description}
         initialNodes={[]} // Would need to fetch full workflow details from API
         initialEdges={[]}
         onSave={handleSaveWorkflow}
@@ -166,7 +205,7 @@ const SmartAutomations = () => {
         rightSlot={
           <Button
             type="primary"
-            size="small"
+            size="large"
             icon={<ThemeIcon src={RcIconPlus} className="w-12 h-12" />}
             onClick={handleCreateNew}
           >
@@ -178,14 +217,22 @@ const SmartAutomations = () => {
       </PageHeader>
 
       <div className="bg-r-neutral-card rounded-8 p-16 mb-16">
-        <div className="text-r-neutral-title text-14 font-medium mb-12">Execution mode</div>
+        <div className="text-r-neutral-title text-14 font-medium mb-12">
+          Execution mode
+        </div>
         <div className="flex justify-between items-center">
           <span className="text-r-neutral-body text-13">
             {roleDelegation
-              ? `Safe + Roles (configured: ${roleDelegation.safeAddress.slice(0, 8)}…)`
+              ? `Safe + Roles (configured: ${roleDelegation.safeAddress.slice(
+                  0,
+                  8
+                )}…)`
               : 'Direct (EOA)'}
           </span>
-          <Button size="small" onClick={() => setShowDelegationSettings(!showDelegationSettings)}>
+          <Button
+            size="small"
+            onClick={() => setShowDelegationSettings(!showDelegationSettings)}
+          >
             {showDelegationSettings ? 'Hide' : 'Configure'}
           </Button>
         </div>
@@ -202,7 +249,9 @@ const SmartAutomations = () => {
                   setShowDelegationSettings(false);
                   message.success('Delegation settings saved');
                 } catch (e) {
-                  message.error(`Failed to save delegation: ${(e as Error).message}`);
+                  message.error(
+                    `Failed to save delegation: ${(e as Error).message}`
+                  );
                 } finally {
                   setDelegationLoading(false);
                 }
@@ -216,7 +265,9 @@ const SmartAutomations = () => {
                   setShowDelegationSettings(false);
                   message.success('Delegation cleared');
                 } catch (e) {
-                  message.error(`Failed to clear delegation: ${(e as Error).message}`);
+                  message.error(
+                    `Failed to clear delegation: ${(e as Error).message}`
+                  );
                 } finally {
                   setDelegationLoading(false);
                 }
@@ -241,10 +292,12 @@ const SmartAutomations = () => {
             <Select
               value={selectedChain?.label}
               onChange={(value) => {
-                const chain = listVerifiedChains().find((c) => c.label === value);
+                const chain = listVerifiedChains().find(
+                  (c) => c.label === value
+                );
                 if (chain) setSelectedChain(chain);
               }}
-              style={{ width: 200 }}
+              className="w-48"
               size="small"
             >
               {listVerifiedChains().map((chain) => (
@@ -258,9 +311,11 @@ const SmartAutomations = () => {
           {selectedChain?.aaveV3Pool && (
             <div className="flex justify-between">
               <span className="text-r-neutral-body">Aave V3</span>
-              {healthFactorData.loading && <span className="text-r-neutral-foot">Loading…</span>}
+              {healthFactorData.loading && (
+                <span className="text-r-neutral-foot">Loading…</span>
+              )}
               {healthFactorData.error && (
-                <span className="text-red-forbidden">Error</span>
+                <span className="text-r-red-default">Error</span>
               )}
               {!healthFactorData.loading && !healthFactorData.error && (
                 <span className="text-r-neutral-body">
@@ -277,7 +332,9 @@ const SmartAutomations = () => {
       </div>
 
       <div className="mb-16">
-        <h3 className="text-r-neutral-title text-16 mb-12">Your Workflows</h3>
+        <h3 className="text-r-neutral-title text-16 font-medium mb-12">
+          Your Workflows
+        </h3>
         {workflows.length === 0 ? (
           <div className="text-center text-r-neutral-foot py-32">
             <img
@@ -285,7 +342,9 @@ const SmartAutomations = () => {
               src="/images/nodata-tx.png"
               alt="no workflows"
             />
-            <div className="text-14 mb-8 text-r-neutral-body">No workflows yet</div>
+            <div className="text-14 mb-8 text-r-neutral-body">
+              No workflows yet
+            </div>
             <div className="text-12 text-r-neutral-foot">
               Create your first automation to get started
             </div>

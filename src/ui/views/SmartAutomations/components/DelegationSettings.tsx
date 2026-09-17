@@ -1,12 +1,22 @@
 import React, { useState } from 'react';
-import { Input, Button, Alert, Typography, Space, Collapse, Steps, Card, message } from 'antd';
+import {
+  Input,
+  Button,
+  Alert,
+  Typography,
+  Space,
+  Collapse,
+  Steps,
+  Card,
+  message,
+} from 'antd';
 import {
   predictSafeAddress,
   buildSafeDeploymentTransaction,
   isRolesModifierEnabled,
   fetchKnownRolesModifier,
-  type Eip1193Provider,
 } from '../delegation/safeDeployment';
+import type { Eip1193Provider } from '../delegation/safeDeployment';
 import {
   buildApplyRoleTransactions,
   liquidationShieldPermissions,
@@ -49,7 +59,10 @@ const isAddress = (v: string) => /^0x[a-fA-F0-9]{40}$/.test(v.trim());
  * wrong for any chain but mainnet and bypasses whatever RPC config/rate
  * limits the user's own Rabby setup already has).
  */
-function makeEip1193Provider(wallet: any, chainServerId: string): Eip1193Provider {
+function makeEip1193Provider(
+  wallet: any,
+  chainServerId: string
+): Eip1193Provider {
   return {
     request: ({ method, params }) =>
       wallet.requestETHRpc({ method, params }, chainServerId),
@@ -101,13 +114,17 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
   const [isPredictingSafe, setIsPredictingSafe] = useState(false);
   const [isDeployingSafe, setIsDeployingSafe] = useState(false);
   const [isApplyingPermissions, setIsApplyingPermissions] = useState(false);
-  const [selectedWorkflowType, setSelectedWorkflowType] = useState<string>('liquidation-shield');
+  const [selectedWorkflowType, setSelectedWorkflowType] = useState<string>(
+    'liquidation-shield'
+  );
   const [approveAmount, setApproveAmount] = useState('');
   // Step 3 (Roles Modifier) is manual — the user pastes what they deployed
   // at app.roles.gnosisguild.org, and we verify it on-chain before letting
   // them proceed to applying permissions.
   const [pastedRolesModifier, setPastedRolesModifier] = useState('');
-  const [isVerifyingRolesModifier, setIsVerifyingRolesModifier] = useState(false);
+  const [isVerifyingRolesModifier, setIsVerifyingRolesModifier] = useState(
+    false
+  );
   const [pastedRoleKey, setPastedRoleKey] = useState('');
 
   const valid =
@@ -148,7 +165,9 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
       // so nothing was ever deployed even after the user "completed" setup.
       await wallet.sendRequest({
         method: 'eth_sendTransaction',
-        params: [{ from: accountAddress, to: tx.to, value: tx.value, data: tx.data }],
+        params: [
+          { from: accountAddress, to: tx.to, value: tx.value, data: tx.data },
+        ],
       });
       setGuidedSetupStep(2);
     } catch (e) {
@@ -173,12 +192,15 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
         predictedSafeAddress,
         pastedRolesModifier,
         (params) =>
-          wallet.requestETHRpc({ method: 'eth_call', params: [params, 'latest'] }, chainServerId)
+          wallet.requestETHRpc(
+            { method: 'eth_call', params: [params, 'latest'] },
+            chainServerId
+          )
       );
       if (!enabled) {
         message.error(
           'This address is not enabled as a module on your Safe yet. ' +
-          'Finish attaching it at app.roles.gnosisguild.org first.'
+            'Finish attaching it at app.roles.gnosisguild.org first.'
         );
         return;
       }
@@ -186,7 +208,10 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
       // (very recent deployments may not be indexed yet, or chainId
       // wasn't passed in), so this only informs, it doesn't block.
       if (chainId) {
-        const known = await fetchKnownRolesModifier(chainId, pastedRolesModifier);
+        const known = await fetchKnownRolesModifier(
+          chainId,
+          pastedRolesModifier
+        );
         if (!known) {
           message.info(
             "Verified on-chain that this module is enabled — the subgraph hasn't indexed it yet, which is normal for a recent deployment."
@@ -203,7 +228,12 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
   };
 
   const handleApplyPermissions = async () => {
-    if (!predictedSafeAddress || !rolesModifierAddress || !wallet || !pastedRoleKey) {
+    if (
+      !predictedSafeAddress ||
+      !rolesModifierAddress ||
+      !wallet ||
+      !pastedRoleKey
+    ) {
       message.error('Missing addresses, role key, or wallet');
       return;
     }
@@ -263,7 +293,14 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
       for (const tx of txs) {
         await wallet.sendRequest({
           method: 'eth_sendTransaction',
-          params: [{ from: predictedSafeAddress, to: tx.to, value: tx.value, data: tx.data }],
+          params: [
+            {
+              from: predictedSafeAddress,
+              to: tx.to,
+              value: tx.value,
+              data: tx.data,
+            },
+          ],
         });
       }
       setRoleKey(pastedRoleKey.trim());
@@ -284,34 +321,34 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
         message="Optional: scope automations through a Safe + Zodiac Roles Modifier"
         description={
           <Text>
-            By default, automations execute directly from this account, and
-            an approve() step (if any) is capped at the amount you set when
+            By default, automations execute directly from this account, and an
+            approve() step (if any) is capped at the amount you set when
             creating the workflow. If you&apos;d rather have on-chain
-            enforcement — so the automation literally cannot exceed what a
-            role permits, regardless of what the workflow contains — deploy
-            a Safe and attach a Zodiac Roles Modifier at{' '}
+            enforcement — so the automation literally cannot exceed what a role
+            permits, regardless of what the workflow contains — deploy a Safe
+            and attach a Zodiac Roles Modifier at{' '}
             <Link href="https://app.roles.gnosisguild.org" target="_blank">
               app.roles.gnosisguild.org
             </Link>
-            , grant a role only the specific permissions this automation
-            needs, and paste the resulting addresses below.
+            , grant a role only the specific permissions this automation needs,
+            and paste the resulting addresses below.
           </Text>
         }
-        style={{ marginBottom: 16 }}
+        className="mb-16"
       />
 
       {!showGuidedSetup && (
         <Button
           type="primary"
           onClick={() => setShowGuidedSetup(true)}
-          style={{ marginBottom: 16 }}
+          className="mb-16"
         >
           Set this up for me
         </Button>
       )}
 
       {showGuidedSetup && (
-        <Card size="small" style={{ marginBottom: 16 }}>
+        <Card size="small" className="mb-16">
           <Steps current={guidedSetupStep} size="small">
             <Step title="Predict Safe" />
             <Step title="Deploy Safe" />
@@ -320,19 +357,21 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
           </Steps>
 
           {guidedSetupStep === 0 && (
-            <div style={{ marginTop: 16 }}>
-              <Text>Safe will be deployed with this account as the sole owner.</Text>
+            <div className="mt-16">
+              <Text>
+                Safe will be deployed with this account as the sole owner.
+              </Text>
               <br />
               <Button
                 type="primary"
                 onClick={handlePredictSafe}
                 loading={isPredictingSafe}
-                style={{ marginTop: 8 }}
+                className="mt-8"
               >
                 Predict Safe Address
               </Button>
               {predictedSafeAddress && (
-                <div style={{ marginTop: 8 }}>
+                <div className="mt-8">
                   <Text>Predicted Safe address: {predictedSafeAddress}</Text>
                 </div>
               )}
@@ -340,7 +379,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
           )}
 
           {guidedSetupStep === 1 && (
-            <div style={{ marginTop: 16 }}>
+            <div className="mt-16">
               <Text>Safe address: {predictedSafeAddress}</Text>
               <br />
               <Text type="secondary">
@@ -352,7 +391,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
                 type="primary"
                 onClick={handleDeploySafe}
                 loading={isDeployingSafe}
-                style={{ marginTop: 8 }}
+                className="mt-8"
               >
                 Deploy Safe
               </Button>
@@ -360,17 +399,20 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
           )}
 
           {guidedSetupStep === 2 && (
-            <div style={{ marginTop: 16 }}>
+            <div className="mt-16">
               <Alert
                 type="warning"
                 showIcon
                 message="This step can't be automated"
                 description={
                   <Text>
-                    Rabby has no verified factory address to deploy a new
-                    Zodiac Roles Modifier from — deploying and attaching one
-                    has to happen at{' '}
-                    <Link href="https://app.roles.gnosisguild.org" target="_blank">
+                    Rabby has no verified factory address to deploy a new Zodiac
+                    Roles Modifier from — deploying and attaching one has to
+                    happen at{' '}
+                    <Link
+                      href="https://app.roles.gnosisguild.org"
+                      target="_blank"
+                    >
                       app.roles.gnosisguild.org
                     </Link>
                     , using your Safe address ({predictedSafeAddress}) as the
@@ -379,7 +421,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
                     before continuing.
                   </Text>
                 }
-                style={{ marginBottom: 8 }}
+                className="mb-8"
               />
               <Text strong>Roles Modifier address</Text>
               <Input
@@ -391,7 +433,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
                 type="primary"
                 onClick={handleVerifyRolesModifier}
                 loading={isVerifyingRolesModifier}
-                style={{ marginTop: 8 }}
+                className="mt-8"
               >
                 Verify & Continue
               </Button>
@@ -399,9 +441,9 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
           )}
 
           {guidedSetupStep === 3 && (
-            <div style={{ marginTop: 16 }}>
+            <div className="mt-16">
               <Text>Roles Modifier verified. Now applying permissions...</Text>
-              <div style={{ marginTop: 8 }}>
+              <div className="mt-8">
                 <Text strong>Role key (bytes32)</Text>
                 <Input
                   placeholder="0x..."
@@ -409,12 +451,12 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
                   onChange={(e) => setPastedRoleKey(e.target.value)}
                 />
               </div>
-              <div style={{ marginTop: 8 }}>
+              <div className="mt-8">
                 <Text>Workflow type:</Text>
                 <select
                   value={selectedWorkflowType}
                   onChange={(e) => setSelectedWorkflowType(e.target.value)}
-                  style={{ marginLeft: 8 }}
+                  className="ml-8"
                 >
                   <option value="liquidation-shield">Liquidation Shield</option>
                   <option value="stop-loss">Stop-Loss</option>
@@ -422,13 +464,13 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
                   <option value="yield-harvester">Yield Harvester</option>
                 </select>
               </div>
-              <div style={{ marginTop: 8 }}>
+              <div className="mt-8">
                 <Text>Approve amount (wei):</Text>
                 <Input
                   value={approveAmount}
                   onChange={(e) => setApproveAmount(e.target.value)}
                   placeholder="e.g. 1000000000"
-                  style={{ width: 200, marginLeft: 8 }}
+                  className="w-48 ml-8"
                 />
               </div>
               <Text type="secondary">
@@ -440,7 +482,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
                 type="primary"
                 onClick={handleApplyPermissions}
                 loading={isApplyingPermissions}
-                style={{ marginTop: 8 }}
+                className="mt-8"
               >
                 Apply Permissions
               </Button>
@@ -448,7 +490,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
           )}
 
           {guidedSetupStep === 4 && (
-            <div style={{ marginTop: 16 }}>
+            <div className="mt-16">
               <Alert
                 type="success"
                 message="Setup complete"
@@ -466,7 +508,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
                   setShowGuidedSetup(false);
                   setGuidedSetupStep(0);
                 }}
-                style={{ marginTop: 8, marginRight: 8 }}
+                className="mt-8 mr-8"
               >
                 Save & Done
               </Button>
@@ -475,7 +517,7 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
         </Card>
       )}
 
-      <Collapse ghost style={{ marginTop: 16 }}>
+      <Collapse ghost className="mt-16">
         <Panel header="Manual setup (advanced)" key="manual">
           <Alert
             type="warning"
@@ -484,13 +526,14 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
             description={
               <Text>
                 If you already have a Safe + Roles Modifier deployed, you can
-                paste the addresses below. Otherwise, use the guided setup above.
+                paste the addresses below. Otherwise, use the guided setup
+                above.
               </Text>
             }
-            style={{ marginBottom: 16 }}
+            className="mb-16"
           />
 
-          <Space direction="vertical" style={{ width: '100%' }} size="middle">
+          <Space direction="vertical" className="w-full" size="middle">
             <div>
               <Text strong>Safe address</Text>
               <Input
@@ -542,17 +585,16 @@ export const DelegationSettings: React.FC<DelegationSettingsProps> = ({
         </Panel>
       </Collapse>
 
-      <Collapse ghost style={{ marginTop: 16 }}>
+      <Collapse ghost className="mt-16">
         <Panel header="What exactly does this change?" key="1">
           <Text type="secondary">
             Once saved, every action node in a newly created workflow is
-            rewritten to call execTransactionWithRole on your Roles
-            Modifier instead of calling the target contract directly. If
-            the role you configured doesn&apos;t permit that exact call, the
-            transaction reverts instead of executing — including calls
-            generated by KeeperHub&apos;s AI path, not just the built-in
-            templates. This does not retroactively change automations you
-            already created.
+            rewritten to call execTransactionWithRole on your Roles Modifier
+            instead of calling the target contract directly. If the role you
+            configured doesn&apos;t permit that exact call, the transaction
+            reverts instead of executing — including calls generated by
+            KeeperHub&apos;s AI path, not just the built-in templates. This does
+            not retroactively change automations you already created.
           </Text>
         </Panel>
       </Collapse>

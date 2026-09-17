@@ -365,7 +365,7 @@ export const BroadcastMode = ({
         isNew
         placement="bottom"
         height="265px"
-        visible={drawerVisible}
+        open={drawerVisible}
         onClose={() => setDrawerVisible(false)}
         maskClosable
         closable

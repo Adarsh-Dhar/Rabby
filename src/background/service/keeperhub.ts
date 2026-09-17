@@ -12,6 +12,7 @@ export interface KeeperhubWorkflowRecord {
   address: string;
   chainId: number;
   name: string;
+  description?: string;
   createdAt: number;
   // last status fetched from GET /api/workflows/{id}/executions - not polled
   // in the background, only refreshed on demand when the UI is open.
@@ -41,6 +42,7 @@ class KeeperhubService {
     if (this.initPromise) return this.initPromise;
 
     this.initPromise = (async () => {
+      console.log('Initializing KeeperHub service...');
       this.store = await createPersistStore<KeeperhubStore>({
         name: 'keeperhub',
         template: {
@@ -48,8 +50,16 @@ class KeeperhubService {
           apiKey: '',
         },
       });
+      console.log(
+        'KeeperHub store created, loaded API key:',
+        this.store.apiKey ? '***' + this.store.apiKey.slice(-4) : 'empty'
+      );
       this.apiKey = this.store.apiKey || '';
       this.initialized = true;
+      console.log(
+        'KeeperHub service initialized, API key:',
+        this.apiKey ? '***' + this.apiKey.slice(-4) : 'empty'
+      );
     })();
 
     await this.initPromise;
@@ -65,10 +75,18 @@ class KeeperhubService {
     await this.ensureInitialized();
     this.apiKey = key;
     this.store.apiKey = key;
+    console.log(
+      'KeeperHub API key set:',
+      key ? '***' + key.slice(-4) : 'empty'
+    );
   };
 
   getApiKey = async () => {
     await this.ensureInitialized();
+    console.log(
+      'KeeperHub API key retrieved:',
+      this.apiKey ? '***' + this.apiKey.slice(-4) : 'empty'
+    );
     return this.apiKey;
   };
 
@@ -84,7 +102,10 @@ class KeeperhubService {
     this.store.workflowsByAddress[key] = [...existing, record];
   };
 
-  getWorkflowByName = (address: string, name: string): KeeperhubWorkflowRecord | undefined => {
+  getWorkflowByName = (
+    address: string,
+    name: string
+  ): KeeperhubWorkflowRecord | undefined => {
     const key = address.toLowerCase();
     const existing = this.store.workflowsByAddress[key] || [];
     return existing.find((w) => w.name === name);
@@ -117,7 +138,11 @@ class KeeperhubService {
   updateWorkflowMeta = (
     address: string,
     workflowId: string,
-    patch: { name?: string; lastKnownStatus?: KeeperhubWorkflowRecord['lastKnownStatus'] }
+    patch: {
+      name?: string;
+      description?: string;
+      lastKnownStatus?: KeeperhubWorkflowRecord['lastKnownStatus'];
+    }
   ) => {
     const key = address.toLowerCase();
     const existing = this.store.workflowsByAddress[key] || [];
@@ -126,7 +151,12 @@ class KeeperhubService {
         return {
           ...w,
           ...(patch.name !== undefined && { name: patch.name }),
-          ...(patch.lastKnownStatus !== undefined && { lastKnownStatus: patch.lastKnownStatus }),
+          ...(patch.description !== undefined && {
+            description: patch.description,
+          }),
+          ...(patch.lastKnownStatus !== undefined && {
+            lastKnownStatus: patch.lastKnownStatus,
+          }),
         };
       }
       return w;

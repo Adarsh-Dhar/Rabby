@@ -6986,7 +6986,12 @@ export class WalletController extends BaseController {
     await keeperhubService.setApiKey(key);
   }
   async getKeeperhubApiKeyStatus() {
-    return Boolean(await keeperhubService.getApiKey());
+    const apiKey = await keeperhubService.getApiKey();
+    console.log(
+      'KeeperHub API key status check:',
+      apiKey ? 'has key' : 'no key'
+    );
+    return Boolean(apiKey);
   }
   async clearKeeperhubApiKey() {
     await keeperhubService.clearApiKey();
@@ -7002,7 +7007,12 @@ export class WalletController extends BaseController {
   }
   setRoleDelegation(
     address: string,
-    config: { safeAddress: string; rolesModifierAddress: string; roleKey: string; chainId: number }
+    config: {
+      safeAddress: string;
+      rolesModifierAddress: string;
+      roleKey: string;
+      chainId: number;
+    }
   ) {
     return roleDelegationService.set(address, config);
   }
@@ -7019,7 +7029,9 @@ export class WalletController extends BaseController {
       remoteWorkflows.forEach((remote) => {
         const local = workflows.find((w) => w.workflowId === remote.id);
         if (local && local.name !== remote.name) {
-          keeperhubService.updateWorkflowMeta(address, remote.id, { name: remote.name });
+          keeperhubService.updateWorkflowMeta(address, remote.id, {
+            name: remote.name,
+          });
         }
       });
     } catch (error) {
@@ -7027,12 +7039,9 @@ export class WalletController extends BaseController {
       console.error('Failed to sync workflow names from remote:', error);
     }
     return keeperhubService.getWorkflows(address);
-  };
+  }
 
-  async getKeeperhubWorkflowExecutions(
-    address: string,
-    workflowId: string
-  ) {
+  async getKeeperhubWorkflowExecutions(address: string, workflowId: string) {
     try {
       const executions = await keeperhubMCPService.listExecutions(workflowId);
 
@@ -7040,12 +7049,19 @@ export class WalletController extends BaseController {
       return executions.map((exec) => ({
         id: exec.id,
         workflowId: exec.workflowId,
-        status: (exec.status === 'pending' ? 'running' :
-                 exec.status === 'running' ? 'running' :
-                 exec.status === 'completed' ? 'success' :
-                 exec.status === 'failed' ? 'error' : 'error') as 'success' | 'error' | 'running',
+        status: (exec.status === 'pending'
+          ? 'running'
+          : exec.status === 'running'
+          ? 'running'
+          : exec.status === 'completed'
+          ? 'success'
+          : exec.status === 'failed'
+          ? 'error'
+          : 'error') as 'success' | 'error' | 'running',
         timestamp: new Date(exec.startedAt).getTime(),
-        completedAt: exec.completedAt ? new Date(exec.completedAt).getTime() : undefined,
+        completedAt: exec.completedAt
+          ? new Date(exec.completedAt).getTime()
+          : undefined,
         logs: exec.logs || [],
         transactionHashes: exec.transactionHashes || {},
       }));
@@ -7064,11 +7080,15 @@ export class WalletController extends BaseController {
     chainId: number;
     type: 'liquidation-shield' | 'yield-harvester' | 'stop-loss' | 'twap';
     name: string;
+    description?: string;
     nodes: unknown[];
     edges: unknown[];
   }) {
     // Enforce per-account uniqueness on create
-    const existing = keeperhubService.getWorkflowByName(params.address, params.name);
+    const existing = keeperhubService.getWorkflowByName(
+      params.address,
+      params.name
+    );
     if (existing) {
       throw new Error(
         `A workflow with the name "${params.name}" already exists for this account`
@@ -7078,6 +7098,7 @@ export class WalletController extends BaseController {
     try {
       const workflow = await keeperhubMCPService.createWorkflow({
         name: params.name,
+        description: params.description,
         nodes: params.nodes as any,
         edges: params.edges as any,
         enabled: true,
@@ -7087,6 +7108,7 @@ export class WalletController extends BaseController {
         workflowId: workflow.id,
         type: params.type,
         name: params.name,
+        description: params.description,
         address: params.address,
         chainId: params.chainId,
         createdAt: Date.now(),
@@ -7102,10 +7124,7 @@ export class WalletController extends BaseController {
 
   // GET /api/workflows/{id}/executions - refreshed on demand only, never
   // polled from the background (see keeperhub.ts comments on why).
-  async refreshKeeperhubWorkflowStatus(
-    address: string,
-    workflowId: string
-  ) {
+  async refreshKeeperhubWorkflowStatus(address: string, workflowId: string) {
     try {
       const executions = await keeperhubMCPService.listExecutions(workflowId);
       keeperhubService.updateWorkflowStatus(address, workflowId, 'active');
@@ -7132,6 +7151,7 @@ export class WalletController extends BaseController {
     workflowId: string,
     patch: {
       name?: string;
+      description?: string;
       enabled?: boolean;
       nodes?: MCPWorkflowNode[];
       edges?: MCPWorkflowEdge[];
@@ -7149,9 +7169,10 @@ export class WalletController extends BaseController {
 
     const result = await keeperhubMCPService.updateWorkflow(workflowId, patch);
 
-    if (patch.name || patch.enabled !== undefined) {
+    if (patch.name || patch.description || patch.enabled !== undefined) {
       keeperhubService.updateWorkflowMeta(address, workflowId, {
         name: patch.name,
+        description: patch.description,
         lastKnownStatus: patch.enabled === false ? 'paused' : undefined,
       });
     }
@@ -7667,7 +7688,10 @@ export class WalletController extends BaseController {
           method: 'eth_call',
           params: [
             {
-              data: encodeFunctionData({ abi: decimalsAbi, functionName: 'decimals' }),
+              data: encodeFunctionData({
+                abi: decimalsAbi,
+                functionName: 'decimals',
+              }),
               to: tokenAddress,
             },
             'latest',

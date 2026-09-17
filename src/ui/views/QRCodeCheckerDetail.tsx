@@ -35,7 +35,7 @@ const QRCodeCheckerDetail = ({
       title="Error"
       placement="bottom"
       className="signature-qr-checker-drawer"
-      visible={visible}
+      open={visible}
       destroyOnClose
       onClose={onCancel}
       height={620}

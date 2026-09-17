@@ -200,7 +200,7 @@ export const SwapTokenItem = (props: SwapTokenItemProps) => {
               onAfterChange={onAfterChangeSlider}
               min={0}
               max={100}
-              tooltipVisible={false}
+              tooltip={{ open: false }}
               disabled={!token || disabled}
             />
             <span className="absolute top-1/2 -right-12 transform -translate-y-1/2 w-[38px] text-13 text-r-blue-default font-medium">

@@ -3,10 +3,37 @@ import { Input, Collapse, Button, Tag } from 'antd';
 import { ReactComponent as RcIconPlus } from 'ui/assets/plus.svg';
 import { ReactComponent as RcIconDelete } from 'ui/assets/address/delete.svg';
 import ThemeIcon from '@/ui/component/ThemeMode/ThemeIcon';
-import type { MCPWorkflowNode, MCPWorkflowEdge } from 'background/service/keeperhubMCP';
 import type { DraftDefinition } from './index';
 
 const { TextArea } = Input;
+const { Panel } = Collapse;
+
+interface NodeData {
+  label?: string;
+  type?: string;
+  description?: string;
+  config?: {
+    actionType?: string;
+    contractAddress?: string;
+    functionName?: string;
+    functionArgs?: string;
+    triggerType?: string;
+    [key: string]: unknown;
+  };
+}
+
+interface WorkflowNode {
+  id: string;
+  type: 'trigger' | 'action' | 'condition';
+  data: NodeData;
+  position?: { x: number; y: number };
+}
+
+interface WorkflowEdge {
+  id: string;
+  source: string;
+  target: string;
+}
 
 interface FormPaneProps {
   definition: DraftDefinition;
@@ -18,11 +45,13 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
     onChange({ name: e.target.value });
   };
 
-  const handleDescriptionChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleDescriptionChange = (
+    e: React.ChangeEvent<HTMLTextAreaElement>
+  ) => {
     onChange({ description: e.target.value });
   };
 
-  const handleNodeChange = (index: number, field: string, value: any) => {
+  const handleNodeChange = (index: number, field: string, value: unknown) => {
     const newNodes = [...definition.nodes];
     newNodes[index] = {
       ...newNodes[index],
@@ -31,7 +60,11 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
     onChange({ nodes: newNodes });
   };
 
-  const handleNodeDataChange = (index: number, field: string, value: any) => {
+  const handleNodeDataChange = (
+    index: number,
+    field: string,
+    value: unknown
+  ) => {
     const newNodes = [...definition.nodes];
     newNodes[index] = {
       ...newNodes[index],
@@ -43,7 +76,11 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
     onChange({ nodes: newNodes });
   };
 
-  const handleNodeConfigChange = (index: number, field: string, value: any) => {
+  const handleNodeConfigChange = (
+    index: number,
+    field: string,
+    value: unknown
+  ) => {
     const newNodes = [...definition.nodes];
     newNodes[index] = {
       ...newNodes[index],
@@ -59,7 +96,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
   };
 
   const addNode = () => {
-    const newNode: MCPWorkflowNode = {
+    const newNode: WorkflowNode = {
       id: `node-${Date.now()}`,
       type: 'action',
       data: {
@@ -81,7 +118,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
     if (definition.nodes.length < 2) {
       return; // Need at least 2 nodes to create an edge
     }
-    const newEdge: MCPWorkflowEdge = {
+    const newEdge: WorkflowEdge = {
       id: `edge-${Date.now()}`,
       source: definition.nodes[0].id,
       target: definition.nodes[definition.nodes.length - 1].id,
@@ -94,7 +131,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
     onChange({ edges: newEdges });
   };
 
-  const renderNodeConfig = (node: MCPWorkflowNode, index: number) => {
+  const renderNodeConfig = (node: WorkflowNode, index: number) => {
     const config = node.data?.config || {};
 
     return (
@@ -104,7 +141,9 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
             <div className="text-r-neutral-foot text-12 w-120">{key}</div>
             <Input
               value={typeof value === 'string' ? value : JSON.stringify(value)}
-              onChange={(e) => handleNodeConfigChange(index, key, e.target.value)}
+              onChange={(e) =>
+                handleNodeConfigChange(index, key, e.target.value)
+              }
               className="flex-1"
               size="small"
             />
@@ -118,10 +157,12 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
     <div className="flex min-h-0 flex-col h-full gap-16 overflow-y-auto p-16">
       {/* Basic Info */}
       <div className="bg-r-neutral-card rounded-8 p-16">
-        <div className="text-r-neutral-title text-14 font-medium mb-12">Workflow Details</div>
+        <div className="text-r-neutral-title text-14 font-medium mb-12">
+          Workflow Details
+        </div>
         <div className="flex flex-col gap-12">
           <div>
-            <div className="text-r-neutral-foot text-12 mb-4">Name</div>
+            <div className="text-r-neutral-foot text-12 mb-6">Name</div>
             <Input
               value={definition.name}
               onChange={handleNameChange}
@@ -131,7 +172,9 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
           </div>
           {definition.description !== undefined && (
             <div>
-              <div className="text-r-neutral-foot text-12 mb-4">Description</div>
+              <div className="text-r-neutral-foot text-12 mb-4">
+                Description
+              </div>
               <TextArea
                 value={definition.description}
                 onChange={handleDescriptionChange}
@@ -160,71 +203,94 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
           </Button>
         </div>
         <div className="flex flex-col gap-12">
-          {definition.nodes.map((node, index) => (
-            <Collapse
-              key={node.id}
-              size="small"
-              items={[
-                {
-                  key: node.id,
-                  label: (
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-8">
-                        <Tag color={node.type === 'trigger' ? 'blue' : node.type === 'action' ? 'green' : 'orange'}>
-                          {node.type}
-                        </Tag>
-                        <span>{node.data?.label || node.id}</span>
-                      </span>
-                      <Button
-                        type="text"
+          {definition.nodes.map((node: WorkflowNode, index: number) => (
+            <Collapse key={node.id}>
+              <Panel
+                header={
+                  <div className="flex items-center justify-between">
+                    <span className="flex items-center gap-8">
+                      <Tag
+                        color={
+                          node.type === 'trigger'
+                            ? 'blue'
+                            : node.type === 'action'
+                            ? 'green'
+                            : 'orange'
+                        }
+                      >
+                        {node.type}
+                      </Tag>
+                      <span>{node.data?.label || node.id}</span>
+                    </span>
+                    <Button
+                      type="text"
+                      size="small"
+                      danger
+                      icon={
+                        <ThemeIcon src={RcIconDelete} className="w-14 h-14" />
+                      }
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeNode(index);
+                      }}
+                    />
+                  </div>
+                }
+                key={node.id}
+              >
+                <div className="flex flex-col gap-12">
+                  <div className="flex gap-8">
+                    <div className="flex-1">
+                      <div className="text-r-neutral-foot text-12 mb-4">
+                        Label
+                      </div>
+                      <Input
+                        value={node.data?.label || ''}
+                        onChange={(e) =>
+                          handleNodeDataChange(index, 'label', e.target.value)
+                        }
                         size="small"
-                        danger
-                        icon={<ThemeIcon src={RcIconDelete} className="w-14 h-14" />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeNode(index);
-                        }}
                       />
                     </div>
-                  ),
-                  children: (
-                    <div className="flex flex-col gap-12">
-                      <div className="flex gap-8">
-                        <div className="flex-1">
-                          <div className="text-r-neutral-foot text-12 mb-4">Label</div>
-                          <Input
-                            value={node.data?.label || ''}
-                            onChange={(e) => handleNodeDataChange(index, 'label', e.target.value)}
-                            size="small"
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <div className="text-r-neutral-foot text-12 mb-4">Type</div>
-                          <Input
-                            value={node.data?.type || ''}
-                            onChange={(e) => handleNodeDataChange(index, 'type', e.target.value)}
-                            size="small"
-                          />
-                        </div>
+                    <div className="flex-1">
+                      <div className="text-r-neutral-foot text-12 mb-4">
+                        Type
                       </div>
-                      <div>
-                        <div className="text-r-neutral-foot text-12 mb-4">Description</div>
-                        <TextArea
-                          value={node.data?.description || ''}
-                          onChange={(e) => handleNodeDataChange(index, 'description', e.target.value)}
-                          autoSize={{ minRows: 1, maxRows: 3 }}
-                          size="small"
-                        />
-                      </div>
-                      <div>
-                        <div className="text-r-neutral-foot text-12 mb-4">Config</div>
-                        {renderNodeConfig(node, index)}
-                      </div>
+                      <Input
+                        value={node.data?.type || ''}
+                        onChange={(e) =>
+                          handleNodeDataChange(index, 'type', e.target.value)
+                        }
+                        size="small"
+                      />
                     </div>
-                  ),
-                },
-              ]}
-            />
+                  </div>
+                  <div>
+                    <div className="text-r-neutral-foot text-12 mb-4">
+                      Description
+                    </div>
+                    <TextArea
+                      value={node.data?.description || ''}
+                      onChange={(e) =>
+                        handleNodeDataChange(
+                          index,
+                          'description',
+                          e.target.value
+                        )
+                      }
+                      autoSize={{ minRows: 1, maxRows: 3 }}
+                      size="small"
+                    />
+                  </div>
+                  <div>
+                    <div className="text-r-neutral-foot text-12 mb-4">
+                      Config
+                    </div>
+                    {renderNodeConfig(node, index)}
+                  </div>
+                </div>
+              </Panel>
+            </Collapse>
           ))}
         </div>
       </div>
@@ -246,15 +312,21 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
           </Button>
         </div>
         <div className="flex flex-col gap-8">
-          {definition.edges.map((edge, index) => (
-            <div key={edge.id} className="flex items-center gap-8 p-8 bg-r-neutral-card-1 rounded-4">
+          {definition.edges.map((edge: WorkflowEdge, index: number) => (
+            <div
+              key={edge.id}
+              className="flex items-center gap-8 p-8 bg-r-neutral-card-1 rounded-4"
+            >
               <div className="flex-1">
                 <div className="text-r-neutral-foot text-12 mb-4">Source</div>
                 <Input
                   value={edge.source}
                   onChange={(e) => {
                     const newEdges = [...definition.edges];
-                    newEdges[index] = { ...newEdges[index], source: e.target.value };
+                    newEdges[index] = {
+                      ...newEdges[index],
+                      source: e.target.value,
+                    };
                     onChange({ edges: newEdges });
                   }}
                   size="small"
@@ -267,7 +339,10 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
                   value={edge.target}
                   onChange={(e) => {
                     const newEdges = [...definition.edges];
-                    newEdges[index] = { ...newEdges[index], target: e.target.value };
+                    newEdges[index] = {
+                      ...newEdges[index],
+                      target: e.target.value,
+                    };
                     onChange({ edges: newEdges });
                   }}
                   size="small"

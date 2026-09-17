@@ -1,8 +1,5 @@
 import { createPersistStore } from 'background/utils';
-import type {
-  MCPWorkflowNode,
-  MCPWorkflowEdge,
-} from './keeperhubMCP';
+import type { MCPWorkflowNode, MCPWorkflowEdge } from './keeperhubMCP';
 
 interface AiProviderStore {
   geminiApiKey: string;
@@ -103,7 +100,11 @@ class AiProviderService {
     }
 
     // Build the system prompt with schema and few-shot examples
-    const systemPrompt = this.buildSystemPrompt(params.currentDefinition, params.chainId, params.address);
+    const systemPrompt = this.buildSystemPrompt(
+      params.currentDefinition,
+      params.chainId,
+      params.address
+    );
 
     // Convert messages to Gemini format
     const contents = params.messages.map((msg) => ({
@@ -134,9 +135,7 @@ class AiProviderService {
 
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(
-          `Gemini API error: ${response.status} - ${errorText}`
-        );
+        throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
       }
 
       const result = await response.json();
@@ -146,7 +145,11 @@ class AiProviderService {
       }
 
       const candidate = result.candidates[0];
-      if (!candidate.content || !candidate.content.parts || candidate.content.parts.length === 0) {
+      if (
+        !candidate.content ||
+        !candidate.content.parts ||
+        candidate.content.parts.length === 0
+      ) {
         throw new Error('Invalid response structure from Gemini');
       }
 
@@ -155,11 +158,15 @@ class AiProviderService {
 
       // Validate the response structure
       if (!parsed.name || !parsed.nodes || !parsed.edges || !parsed.summary) {
-        throw new Error('Invalid workflow response from Gemini: missing required fields');
+        throw new Error(
+          'Invalid workflow response from Gemini: missing required fields'
+        );
       }
 
       if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) {
-        throw new Error('Invalid workflow response from Gemini: nodes and edges must be arrays');
+        throw new Error(
+          'Invalid workflow response from Gemini: nodes and edges must be arrays'
+        );
       }
 
       return parsed;
@@ -170,7 +177,10 @@ class AiProviderService {
         if (error.message.includes('API key')) {
           throw error;
         }
-        if (error.message.includes('fetch') || error.message.includes('network')) {
+        if (
+          error.message.includes('fetch') ||
+          error.message.includes('network')
+        ) {
           throw new Error(
             'Network error connecting to Gemini. Please check your connection.'
           );
@@ -182,7 +192,9 @@ class AiProviderService {
         }
       }
 
-      throw new Error('Failed to generate workflow with Gemini. Please try again later.');
+      throw new Error(
+        'Failed to generate workflow with Gemini. Please try again later.'
+      );
     }
   }
 
@@ -239,7 +251,11 @@ IMPORTANT CONSTRAINTS:
 `;
 
     if (currentDefinition) {
-      prompt += `\n\nCURRENT WORKFLOW STATE (for diff/modify):\n${JSON.stringify(currentDefinition, null, 2)}\n\nWhen modifying, explain what changed in the summary field.`;
+      prompt += `\n\nCURRENT WORKFLOW STATE (for diff/modify):\n${JSON.stringify(
+        currentDefinition,
+        null,
+        2
+      )}\n\nWhen modifying, explain what changed in the summary field.`;
     }
 
     if (chainId && address) {
@@ -391,7 +407,8 @@ EXAMPLE 2 - Yield Harvester:
         },
         summary: {
           type: 'string',
-          description: 'Human-readable explanation of what changed or was built',
+          description:
+            'Human-readable explanation of what changed or was built',
         },
       },
       required: ['name', 'nodes', 'edges', 'summary'],

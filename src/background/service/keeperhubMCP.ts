@@ -555,6 +555,7 @@ class KeeperhubMCPService {
     workflowId: string,
     patch: {
       name?: string;
+      description?: string;
       enabled?: boolean;
       nodes?: MCPWorkflowNode[];
       edges?: MCPWorkflowEdge[];

@@ -34,21 +34,23 @@ export const MAX_UINT256 =
  *   (via the "allow unlimited" checkbox) — this function does not decide
  *   that policy, it just applies whatever amount the caller resolved.
  */
-export function scopeApproveNodeAmounts<T extends { data: { config?: Record<string, any> } }>(
-  nodes: T[],
-  rawAmount: string
-): T[] {
+export function scopeApproveNodeAmounts<
+  T extends { data: { config?: Record<string, any> } }
+>(nodes: T[], rawAmount: string): T[] {
   return nodes.map((node) => {
     const config = node.data?.config;
     if (!config || config.functionName !== 'approve') {
       return node;
     }
-    if (config.actionType !== 'web3/write-contract' || typeof config.functionArgs !== 'string') {
+    if (
+      config.actionType !== 'web3/write-contract' ||
+      typeof config.functionArgs !== 'string'
+    ) {
       // eslint-disable-next-line no-console
       console.warn(
-        `scopeApproveNodeAmounts: found an approve() node with an unexpected shape ` +
+        'scopeApproveNodeAmounts: found an approve() node with an unexpected shape ' +
           `(actionType=${config.actionType}) — leaving it unscoped. This node will ` +
-          `execute with whatever amount it already has, uncapped.`
+          'execute with whatever amount it already has, uncapped.'
       );
       return node;
     }
@@ -132,7 +134,10 @@ export async function buildLiquidationShieldWorkflow(params: {
   } catch (error) {
     // Provide more detailed error information
     if (error instanceof Error) {
-      console.error('Failed to generate liquidation shield workflow:', error.message);
+      console.error(
+        'Failed to generate liquidation shield workflow:',
+        error.message
+      );
       // Re-throw API key configuration errors so the UI can handle them appropriately
       if (error.message.includes('API key')) {
         throw error;
@@ -174,8 +179,9 @@ export async function buildLiquidationShieldWorkflow(params: {
               network: '1',
               functionName: 'getUserAccountData',
               actionType: 'web3/read-contract',
-              abi: '[{"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getUserAccountData","outputs":[{"internalType":"uint256","name":"totalCollateralBase","type":"uint256"},{"internalType":"uint256","name":"totalDebtBase","type":"uint256"},{"internalType":"uint256","name":"availableBorrowsBase","type":"uint256"},{"internalType":"uint256","name":"currentLiquidationThreshold","type":"uint256"},{"internalType":"uint256","name":"ltv","type":"uint256"},{"internalType":"uint256","name":"healthFactor","type":"uint256"}],"stateMutability":"view","type":"function"}]',
-              functionArgs: JSON.stringify([params.address])
+              abi:
+                '[{"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getUserAccountData","outputs":[{"internalType":"uint256","name":"totalCollateralBase","type":"uint256"},{"internalType":"uint256","name":"totalDebtBase","type":"uint256"},{"internalType":"uint256","name":"availableBorrowsBase","type":"uint256"},{"internalType":"uint256","name":"currentLiquidationThreshold","type":"uint256"},{"internalType":"uint256","name":"ltv","type":"uint256"},{"internalType":"uint256","name":"healthFactor","type":"uint256"}],"stateMutability":"view","type":"function"}]',
+              functionArgs: JSON.stringify([params.address]),
             },
             status: 'idle',
           },
@@ -197,12 +203,14 @@ export async function buildLiquidationShieldWorkflow(params: {
                     id: `rule-1-${timestamp}`,
                     operator: '<',
                     leftOperand: `{{@step-1-${timestamp}:Get Aave Health Factor.result.healthFactor}}`,
-                    rightOperand: String(params.healthFactorThreshold * 1e18)
-                  }
-                ]
+                    rightOperand: String(params.healthFactorThreshold * 1e18),
+                  },
+                ],
               },
-              condition: `{{@step-1-${timestamp}:Get Aave Health Factor.result.healthFactor}} < ${params.healthFactorThreshold * 1e18}`,
-              actionType: 'Condition'
+              condition: `{{@step-1-${timestamp}:Get Aave Health Factor.result.healthFactor}} < ${
+                params.healthFactorThreshold * 1e18
+              }`,
+              actionType: 'Condition',
             },
             status: 'idle',
           },
@@ -220,11 +228,9 @@ export async function buildLiquidationShieldWorkflow(params: {
               network: '1',
               functionName: 'approve',
               actionType: 'web3/write-contract',
-              abi: '[{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]',
-              functionArgs: JSON.stringify([
-                AAVE_V3_POOL_ADDRESS,
-                MAX_UINT256
-              ])
+              abi:
+                '[{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]',
+              functionArgs: JSON.stringify([AAVE_V3_POOL_ADDRESS, MAX_UINT256]),
             },
             status: 'idle',
           },
@@ -242,13 +248,14 @@ export async function buildLiquidationShieldWorkflow(params: {
               network: '1',
               functionName: 'repay',
               actionType: 'web3/write-contract',
-              abi: '[{"inputs":[{"internalType":"address","name":"asset","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"interestRateMode","type":"uint256"},{"internalType":"address","name":"onBehalfOf","type":"address"}],"name":"repay","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"}]',
+              abi:
+                '[{"inputs":[{"internalType":"address","name":"asset","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"internalType":"uint256","name":"interestRateMode","type":"uint256"},{"internalType":"address","name":"onBehalfOf","type":"address"}],"name":"repay","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"}]',
               functionArgs: JSON.stringify([
                 USDC_ADDRESS,
                 MAX_UINT256,
                 1, // Stable rate
-                params.address
-              ])
+                params.address,
+              ]),
             },
             status: 'idle',
           },
@@ -317,7 +324,10 @@ export async function buildYieldHarvesterWorkflow(params: {
     };
   } catch (error) {
     if (error instanceof Error) {
-      console.error('Failed to generate yield harvester workflow:', error.message);
+      console.error(
+        'Failed to generate yield harvester workflow:',
+        error.message
+      );
       // Re-throw API key configuration errors so the UI can handle them appropriately
       if (error.message.includes('API key')) {
         throw error;
@@ -358,8 +368,9 @@ export async function buildYieldHarvesterWorkflow(params: {
               network: '1',
               functionName: 'getUserAccountData',
               actionType: 'web3/read-contract',
-              abi: '[{"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getUserAccountData","outputs":[{"internalType":"uint256","name":"totalCollateralBase","type":"uint256"},{"internalType":"uint256","name":"totalDebtBase","type":"uint256"},{"internalType":"uint256","name":"availableBorrowsBase","type":"uint256"},{"internalType":"uint256","name":"currentLiquidationThreshold","type":"uint256"},{"internalType":"uint256","name":"ltv","type":"uint256"},{"internalType":"uint256","name":"healthFactor","type":"uint256"}],"stateMutability":"view","type":"function"}]',
-              functionArgs: JSON.stringify([params.address])
+              abi:
+                '[{"inputs":[{"internalType":"address","name":"user","type":"address"}],"name":"getUserAccountData","outputs":[{"internalType":"uint256","name":"totalCollateralBase","type":"uint256"},{"internalType":"uint256","name":"totalDebtBase","type":"uint256"},{"internalType":"uint256","name":"availableBorrowsBase","type":"uint256"},{"internalType":"uint256","name":"currentLiquidationThreshold","type":"uint256"},{"internalType":"uint256","name":"ltv","type":"uint256"},{"internalType":"uint256","name":"healthFactor","type":"uint256"}],"stateMutability":"view","type":"function"}]',
+              functionArgs: JSON.stringify([params.address]),
             },
             status: 'idle',
           },
@@ -381,12 +392,12 @@ export async function buildYieldHarvesterWorkflow(params: {
                     id: `rule-1-${timestamp}`,
                     operator: '>',
                     leftOperand: `{{@step-1-${timestamp}:Get Aave Rewards.result.totalCollateralBase}}`,
-                    rightOperand: '10000000000000000' // 0.01 ETH
-                  }
-                ]
+                    rightOperand: '10000000000000000', // 0.01 ETH
+                  },
+                ],
               },
               condition: `{{@step-1-${timestamp}:Get Aave Rewards.result.totalCollateralBase}} > 10000000000000000`,
-              actionType: 'Condition'
+              actionType: 'Condition',
             },
             status: 'idle',
           },
@@ -404,11 +415,12 @@ export async function buildYieldHarvesterWorkflow(params: {
               network: '1',
               functionName: 'claimRewardsToUser',
               actionType: 'web3/write-contract',
-              abi: '[{"inputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"address[]","name":"rewardTokens","type":"address[]"}],"name":"claimRewardsToUser","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"}]',
+              abi:
+                '[{"inputs":[{"internalType":"address","name":"user","type":"address"},{"internalType":"address[]","name":"rewardTokens","type":"address[]"}],"name":"claimRewardsToUser","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"nonpayable","type":"function"}]',
               functionArgs: JSON.stringify([
                 params.address,
-                ['0x4D5F47FA6A74077f613766d14c8D74A6416621E8'] // Example reward token (AAVE)
-              ])
+                ['0x4D5F47FA6A74077f613766d14c8D74A6416621E8'], // Example reward token (AAVE)
+              ]),
             },
             status: 'idle',
           },
@@ -516,18 +528,22 @@ export async function buildTwapWorkflow(params: {
           type: 'action',
           data: {
             label: 'Approve Token',
-            description: `Approve Uniswap Router to spend ${params.sellToken.slice(0, 8)}…`,
+            description: `Approve Uniswap Router to spend ${params.sellToken.slice(
+              0,
+              8
+            )}…`,
             type: 'action',
             config: {
               contractAddress: params.sellToken,
               network: '1',
               functionName: 'approve',
               actionType: 'web3/write-contract',
-              abi: '[{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]',
+              abi:
+                '[{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]',
               functionArgs: JSON.stringify([
                 UNISWAP_V3_ROUTER_ADDRESS,
-                params.totalSellAmount
-              ])
+                params.totalSellAmount,
+              ]),
             },
             status: 'idle',
           },
@@ -538,14 +554,18 @@ export async function buildTwapWorkflow(params: {
           type: 'action',
           data: {
             label: 'Execute Swap',
-            description: `Sell ${params.sellToken.slice(0, 8)}… for ${params.buyToken.slice(0, 8)}…`,
+            description: `Sell ${params.sellToken.slice(
+              0,
+              8
+            )}… for ${params.buyToken.slice(0, 8)}…`,
             type: 'action',
             config: {
               contractAddress: UNISWAP_V3_ROUTER_ADDRESS,
               network: '1',
               functionName: 'exactInputSingle',
               actionType: 'web3/write-contract',
-              abi: '[{"inputs":[{"components":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"address","name":"tokenOut","type":"address"},{"internalType":"uint24","name":"fee","type":"uint24"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"amountOutMinimum","type":"uint256"},{"internalType":"uint160","name":"sqrtPriceLimitX96","type":"uint160"}],"internalType":"struct ISwapRouter.ExactInputSingleParams","name":"params","type":"tuple"}],"name":"exactInputSingle","outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],"stateMutability":"payable","type":"function"}]',
+              abi:
+                '[{"inputs":[{"components":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"address","name":"tokenOut","type":"address"},{"internalType":"uint24","name":"fee","type":"uint24"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"amountOutMinimum","type":"uint256"},{"internalType":"uint160","name":"sqrtPriceLimitX96","type":"uint160"}],"internalType":"struct ISwapRouter.ExactInputSingleParams","name":"params","type":"tuple"}],"name":"exactInputSingle","outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],"stateMutability":"payable","type":"function"}]',
               functionArgs: JSON.stringify([
                 {
                   tokenIn: params.sellToken,
@@ -555,9 +575,9 @@ export async function buildTwapWorkflow(params: {
                   deadline: Math.floor(Date.now() / 1000) + 3600,
                   amountIn: params.totalSellAmount,
                   amountOutMinimum: params.totalBuyAmountMin,
-                  sqrtPriceLimitX96: '0'
-                }
-              ])
+                  sqrtPriceLimitX96: '0',
+                },
+              ]),
             },
             status: 'idle',
           },
@@ -661,7 +681,8 @@ export async function buildStopLossWorkflow(params: {
               network: '1',
               functionName: 'slot0',
               actionType: 'web3/read-contract',
-              abi: '[{"inputs":[],"name":"slot0","outputs":[{"internalType":"uint160","name":"sqrtPriceX96","type":"uint160"},{"internalType":"int24","name":"tick","type":"int24"},{"internalType":"uint16","name":"observationIndex","type":"uint16"},{"internalType":"uint16","name":"observationCardinality","type":"uint16"},{"internalType":"uint16","name":"observationCardinalityNext","type":"uint16"},{"internalType":"uint8","name":"feeProtocol","type":"uint8"},{"internalType":"bool","name":"unlocked","type":"bool"}],"stateMutability":"view","type":"function"}]'
+              abi:
+                '[{"inputs":[],"name":"slot0","outputs":[{"internalType":"uint160","name":"sqrtPriceX96","type":"uint160"},{"internalType":"int24","name":"tick","type":"int24"},{"internalType":"uint16","name":"observationIndex","type":"uint16"},{"internalType":"uint16","name":"observationCardinality","type":"uint16"},{"internalType":"uint16","name":"observationCardinalityNext","type":"uint16"},{"internalType":"uint8","name":"feeProtocol","type":"uint8"},{"internalType":"bool","name":"unlocked","type":"bool"}],"stateMutability":"view","type":"function"}]',
             },
             status: 'idle',
           },
@@ -683,12 +704,14 @@ export async function buildStopLossWorkflow(params: {
                     id: `rule-1-${timestamp}`,
                     operator: '<',
                     leftOperand: `{{@step-1-${timestamp}:Get Token Price.result.sqrtPriceX96}}`,
-                    rightOperand: String(params.thresholdPrice * 1e18)
-                  }
-                ]
+                    rightOperand: String(params.thresholdPrice * 1e18),
+                  },
+                ],
               },
-              condition: `{{@step-1-${timestamp}:Get Token Price.result.sqrtPriceX96}} < ${params.thresholdPrice * 1e18}`,
-              actionType: 'Condition'
+              condition: `{{@step-1-${timestamp}:Get Token Price.result.sqrtPriceX96}} < ${
+                params.thresholdPrice * 1e18
+              }`,
+              actionType: 'Condition',
             },
             status: 'idle',
           },
@@ -706,11 +729,12 @@ export async function buildStopLossWorkflow(params: {
               network: '1',
               functionName: 'approve',
               actionType: 'web3/write-contract',
-              abi: '[{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]',
+              abi:
+                '[{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]',
               functionArgs: JSON.stringify([
                 UNISWAP_V3_ROUTER_ADDRESS,
-                params.sellAmount
-              ])
+                params.sellAmount,
+              ]),
             },
             status: 'idle',
           },
@@ -728,7 +752,8 @@ export async function buildStopLossWorkflow(params: {
               network: '1',
               functionName: 'exactInputSingle',
               actionType: 'web3/write-contract',
-              abi: '[{"inputs":[{"components":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"address","name":"tokenOut","type":"address"},{"internalType":"uint24","name":"fee","type":"uint24"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"amountOutMinimum","type":"uint256"},{"internalType":"uint160","name":"sqrtPriceLimitX96","type":"uint160"}],"internalType":"struct ISwapRouter.ExactInputSingleParams","name":"params","type":"tuple"}],"name":"exactInputSingle","outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],"stateMutability":"payable","type":"function"}]',
+              abi:
+                '[{"inputs":[{"components":[{"internalType":"address","name":"tokenIn","type":"address"},{"internalType":"address","name":"tokenOut","type":"address"},{"internalType":"uint24","name":"fee","type":"uint24"},{"internalType":"address","name":"recipient","type":"address"},{"internalType":"uint256","name":"deadline","type":"uint256"},{"internalType":"uint256","name":"amountIn","type":"uint256"},{"internalType":"uint256","name":"amountOutMinimum","type":"uint256"},{"internalType":"uint160","name":"sqrtPriceLimitX96","type":"uint160"}],"internalType":"struct ISwapRouter.ExactInputSingleParams","name":"params","type":"tuple"}],"name":"exactInputSingle","outputs":[{"internalType":"uint256","name":"amountOut","type":"uint256"}],"stateMutability":"payable","type":"function"}]',
               functionArgs: JSON.stringify([
                 {
                   tokenIn: params.tokenAddress,
@@ -738,9 +763,9 @@ export async function buildStopLossWorkflow(params: {
                   deadline: Math.floor(Date.now() / 1000) + 3600,
                   amountIn: params.sellAmount,
                   amountOutMinimum: '0',
-                  sqrtPriceLimitX96: '0'
-                }
-              ])
+                  sqrtPriceLimitX96: '0',
+                },
+              ]),
             },
             status: 'idle',
           },

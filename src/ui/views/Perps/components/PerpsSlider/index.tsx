@@ -32,7 +32,7 @@ export const PerpsSlider: React.FC<PerpsSliderProps> = ({
         min={min}
         max={max}
         step={step}
-        tooltipVisible={false}
+        tooltip={{ open: false }}
         disabled={disabled}
       />
       {showPercentage && (

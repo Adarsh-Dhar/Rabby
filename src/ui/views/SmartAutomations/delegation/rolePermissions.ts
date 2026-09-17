@@ -35,7 +35,8 @@
  * and argument-level scoping can be layered on later.
  */
 
-import { encodeFunctionData, type Hex } from 'viem';
+import { encodeFunctionData } from 'viem';
+import type { Hex } from 'viem';
 import { rolesAbi, ExecutionOptions } from 'zodiac-roles-sdk';
 
 export interface PermissionTarget {
@@ -158,16 +159,20 @@ export function stopLossPermissions(
       type: 'function',
       stateMutability: 'payable',
       inputs: [
-        { name: 'params', type: 'tuple', components: [
-          { name: 'tokenIn', type: 'address' },
-          { name: 'tokenOut', type: 'address' },
-          { name: 'fee', type: 'uint24' },
-          { name: 'recipient', type: 'address' },
-          { name: 'deadline', type: 'uint256' },
-          { name: 'amountIn', type: 'uint256' },
-          { name: 'amountOutMinimum', type: 'uint256' },
-          { name: 'sqrtPriceLimitX96', type: 'uint160' },
-        ] },
+        {
+          name: 'params',
+          type: 'tuple',
+          components: [
+            { name: 'tokenIn', type: 'address' },
+            { name: 'tokenOut', type: 'address' },
+            { name: 'fee', type: 'uint24' },
+            { name: 'recipient', type: 'address' },
+            { name: 'deadline', type: 'uint256' },
+            { name: 'amountIn', type: 'uint256' },
+            { name: 'amountOutMinimum', type: 'uint256' },
+            { name: 'sqrtPriceLimitX96', type: 'uint160' },
+          ],
+        },
       ],
       outputs: [{ name: 'amountOut', type: 'uint256' }],
     },
@@ -183,16 +188,18 @@ export function stopLossPermissions(
   const swapData = encodeFunctionData({
     abi: UNISWAP_SWAP_ABI,
     functionName: 'exactInputSingle',
-    args: [{
-      tokenIn: tokenAddress as `0x${string}`,
-      tokenOut: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as `0x${string}`, // USDC placeholder
-      fee: 3000,
-      recipient: '0x0000000000000000000000000000000000000000' as `0x${string}`,
-      deadline: BigInt(Math.floor(Date.now() / 1000) + 3600),
-      amountIn: BigInt(capAmount),
-      amountOutMinimum: 0n,
-      sqrtPriceLimitX96: 0n,
-    }],
+    args: [
+      {
+        tokenIn: tokenAddress as `0x${string}`,
+        tokenOut: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' as `0x${string}`, // USDC placeholder
+        fee: 3000,
+        recipient: '0x0000000000000000000000000000000000000000' as `0x${string}`,
+        deadline: BigInt(Math.floor(Date.now() / 1000) + 3600),
+        amountIn: BigInt(capAmount),
+        amountOutMinimum: 0n,
+        sqrtPriceLimitX96: 0n,
+      },
+    ],
   });
 
   return [
@@ -335,10 +342,13 @@ export function buildApplyRoleTransactions(
   }
 
   return permissions.map((permission) => {
-    if (!/^0x[a-fA-F0-9]*$/.test(permission.data) || permission.data.length < 10) {
+    if (
+      !/^0x[a-fA-F0-9]*$/.test(permission.data) ||
+      permission.data.length < 10
+    ) {
       throw new Error(
         `Permission for ${permission.address} has no usable function selector ` +
-        `in its data field (${permission.data}) — cannot scope allowFunction to it.`
+          `in its data field (${permission.data}) — cannot scope allowFunction to it.`
       );
     }
     const selector = permission.data.slice(0, 10) as Hex;
@@ -361,4 +371,3 @@ export function buildApplyRoleTransactions(
     };
   });
 }
-

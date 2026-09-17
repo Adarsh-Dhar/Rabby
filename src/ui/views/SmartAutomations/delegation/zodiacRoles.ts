@@ -142,13 +142,24 @@ const ERC20_APPROVE_ABI = [
  */
 function toRawCall(nodeConfig: Record<string, any>): UnwrappedCall | null {
   if (nodeConfig?.to && nodeConfig?.data) {
-    return { to: nodeConfig.to, value: nodeConfig.value ?? '0', data: nodeConfig.data };
+    return {
+      to: nodeConfig.to,
+      value: nodeConfig.value ?? '0',
+      data: nodeConfig.data,
+    };
   }
-  if (nodeConfig?.actionType === 'erc20/approve' && nodeConfig?.token && nodeConfig?.spender) {
+  if (
+    nodeConfig?.actionType === 'erc20/approve' &&
+    nodeConfig?.token &&
+    nodeConfig?.spender
+  ) {
     const data = encodeFunctionData({
       abi: ERC20_APPROVE_ABI,
       functionName: 'approve',
-      args: [nodeConfig.spender as `0x${string}`, BigInt(nodeConfig.amount ?? '0')],
+      args: [
+        nodeConfig.spender as `0x${string}`,
+        BigInt(nodeConfig.amount ?? '0'),
+      ],
     });
     return { to: nodeConfig.token, value: '0', data };
   }
@@ -182,8 +193,8 @@ export function applyRoleDelegation(
         // eslint-disable-next-line no-console
         console.warn(
           `applyRoleDelegation: don't know how to translate actionType "${nodeConfig.actionType}"` +
-            ` into a raw call yet — this node will still execute directly, NOT through the role.` +
-            ` Add a case in toRawCall() before relying on role delegation for this action type.`
+            ' into a raw call yet — this node will still execute directly, NOT through the role.' +
+            ' Add a case in toRawCall() before relying on role delegation for this action type.'
         );
       }
       return node;

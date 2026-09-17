@@ -1,13 +1,13 @@
 import React from 'react';
-import { Card, Button, Switch, Popconfirm, message } from 'antd';
+import { Card, Button, Switch, Popconfirm } from 'antd';
 import { ReactComponent as RcIconEdit } from 'ui/assets/edit-pen-cc.svg';
 import { ReactComponent as RcIconDelete } from 'ui/assets/address/delete.svg';
 import ThemeIcon from '@/ui/component/ThemeMode/ThemeIcon';
-import clsx from 'clsx';
 
 export interface WorkflowRow {
   workflowId: string;
   name: string;
+  description?: string;
   type: string;
   lastKnownStatus?: 'active' | 'paused' | 'error';
   createdAt: number;
@@ -71,15 +71,18 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
     >
       <div className="flex flex-col gap-8">
         <div className="flex justify-between items-start">
-          <div className="flex-1">
-            <div className="text-r-neutral-title text-16 font-medium mb-4">
+          <div className="flex-1 min-w-0">
+            <div className="text-r-neutral-title text-16 font-medium mb-4 truncate">
               {workflow.name}
             </div>
-            <div className="text-r-neutral-foot text-12">
-              {workflow.type}
-            </div>
+            {workflow.description && (
+              <div className="text-r-neutral-body text-12 mb-2 truncate">
+                {workflow.description}
+              </div>
+            )}
+            <div className="text-r-neutral-foot text-12">{workflow.type}</div>
           </div>
-          <div className={`text-12 font-medium ${getStatusColor()}`}>
+          <div className={`text-12 font-medium ${getStatusColor()} ml-8`}>
             {getStatusText()}
           </div>
         </div>
@@ -94,14 +97,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
               icon={<ThemeIcon src={RcIconEdit} className="w-14 h-14" />}
               onClick={() => onEdit(workflow.workflowId)}
             />
-            <Switch
-              size="small"
-              checked={isEnabled}
-              onChange={handleToggle}
-            />
+            <Switch size="small" checked={isEnabled} onChange={handleToggle} />
             <Popconfirm
-              title="Delete this workflow?"
-              description="This action cannot be undone. The workflow will be removed from your account."
+              title="Delete this workflow? This action cannot be undone. The workflow will be removed from your account."
               onConfirm={handleDelete}
               okText="Delete"
               cancelText="Cancel"

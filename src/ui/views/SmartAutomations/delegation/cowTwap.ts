@@ -64,14 +64,16 @@
  *    to be added (`"@cowprotocol/sdk-viem-adapter": "^0.3.28"`).
  */
 
-import { createPublicClient, custom, type Hex } from 'viem';
+import { createPublicClient, custom } from 'viem';
+import type { Hex } from 'viem';
 import { ViemAdapter } from '@cowprotocol/sdk-viem-adapter';
 import {
   setGlobalAdapter,
   COMPOSABLE_COW_CONTRACT_ADDRESS,
   EXTENSIBLE_FALLBACK_HANDLER_CONTRACT_ADDRESS,
 } from '@cowprotocol/cow-sdk';
-import { Twap, type TwapData } from '@cowprotocol/sdk-composable';
+import { Twap } from '@cowprotocol/sdk-composable';
+import type { TwapData } from '@cowprotocol/sdk-composable';
 
 export interface ComposableCowDeployment {
   chainId: number;
@@ -85,13 +87,21 @@ export interface ComposableCowDeployment {
  * rather than a constant kept by hand in this file. Throws for any chain
  * the SDK doesn't have an entry for, rather than guessing.
  */
-export function getComposableCowDeployment(chainId: number): ComposableCowDeployment {
-  const composableCow = (COMPOSABLE_COW_CONTRACT_ADDRESS as Record<number, string>)[chainId];
-  const extensibleFallbackHandler = (EXTENSIBLE_FALLBACK_HANDLER_CONTRACT_ADDRESS as Record<number, string>)[chainId];
+export function getComposableCowDeployment(
+  chainId: number
+): ComposableCowDeployment {
+  const composableCow = (COMPOSABLE_COW_CONTRACT_ADDRESS as Record<
+    number,
+    string
+  >)[chainId];
+  const extensibleFallbackHandler = (EXTENSIBLE_FALLBACK_HANDLER_CONTRACT_ADDRESS as Record<
+    number,
+    string
+  >)[chainId];
   if (!composableCow || !extensibleFallbackHandler) {
     throw new Error(
       `ComposableCoW is not available on chain ${chainId} per @cowprotocol/cow-sdk's ` +
-      `published deployments. Not falling back to a guessed address.`
+        'published deployments. Not falling back to a guessed address.'
     );
   }
   return { chainId, composableCow, extensibleFallbackHandler };
@@ -114,7 +124,10 @@ export interface TwapOrderParams {
  * dependency on safeDeployment.ts.
  */
 export interface Eip1193Provider {
-  request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
+  request: (args: {
+    method: string;
+    params?: unknown[] | object;
+  }) => Promise<unknown>;
 }
 
 let adapterRegisteredForChain: number | null = null;
@@ -146,7 +159,10 @@ function ensureAdapterForChain(
   chain: { id: number; name: string; nativeCurrency: any; rpcUrls: any }
 ) {
   if (adapterRegisteredForChain === chainId) return;
-  const provider = createPublicClient({ chain: chain as any, transport: custom(provider1193 as any) });
+  const provider = createPublicClient({
+    chain: chain as any,
+    transport: custom(provider1193 as any),
+  });
   // ViemAdapter's own internal address-checksum utility returns `string`
   // where the abstract adapter type in @cowprotocol/sdk-common expects a
   // branded `0x${string}` — a type-strictness mismatch between their two
@@ -186,7 +202,7 @@ export async function assertSafeReadyForComposableCow(
         reason:
           `${safeAddress} does not have the ExtensibleFallbackHandler set` +
           ` (found ${handler}). Complete the ComposableCoW setup at` +
-          ` docs.cow.fi before placing TWAP orders.`,
+          ' docs.cow.fi before placing TWAP orders.',
       };
     }
     return { ready: true };
@@ -221,7 +237,10 @@ export async function assertSafeReadyForComposableCow(
 export function buildTwapCreateTransaction(
   params: TwapOrderParams,
   chainId: number,
-  rpcConfig: { provider: Eip1193Provider; viemChain: { id: number; name: string; nativeCurrency: any; rpcUrls: any } }
+  rpcConfig: {
+    provider: Eip1193Provider;
+    viemChain: { id: number; name: string; nativeCurrency: any; rpcUrls: any };
+  }
 ): { to: string; value: string; data: string; orderId: string } {
   if (params.numParts < 2) {
     throw new Error('TWAP requires at least 2 parts');

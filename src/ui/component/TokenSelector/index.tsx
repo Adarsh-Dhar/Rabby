@@ -740,7 +740,7 @@ function CommonTokenItem(props: {
         overlayClassName={clsx('rectangle')}
         placement="top"
         title={tips}
-        visible={disabled ? undefined : false}
+        open={disabled ? undefined : false}
         align={{ targetOffset: [0, -30] }}
       >
         <ExternalTokenRow
@@ -759,7 +759,7 @@ function CommonTokenItem(props: {
       overlayClassName={clsx('rectangle')}
       placement="top"
       title={tips}
-      visible={disabled ? undefined : false}
+      open={disabled ? undefined : false}
       align={{ targetOffset: [0, -30] }}
     >
       <li

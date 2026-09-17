@@ -77,7 +77,7 @@ export const ExecutionHistory: React.FC<ExecutionHistoryProps> = ({
     <div className="mt-8">
       <div className="text-r-neutral-foot text-12 mb-4">Execution History</div>
       {executions.map((exec) => (
-        <div key={exec.id} className="border-b py-4">
+        <div key={exec.id} className="border-b border-r-neutral-line py-8">
           <div className="flex justify-between text-12 mb-2">
             <span className="text-r-neutral-title">
               {new Date(exec.timestamp).toLocaleString()}
@@ -85,10 +85,10 @@ export const ExecutionHistory: React.FC<ExecutionHistoryProps> = ({
             <span
               className={
                 exec.status === 'success'
-                  ? 'text-green-500'
+                  ? 'text-r-green-success'
                   : exec.status === 'error'
-                  ? 'text-red-500'
-                  : 'text-yellow-500'
+                  ? 'text-r-red-default'
+                  : 'text-r-orange-orange'
               }
             >
               {exec.status}
@@ -103,30 +103,41 @@ export const ExecutionHistory: React.FC<ExecutionHistoryProps> = ({
             <div className="mt-2">
               <div className="text-r-neutral-foot text-12 mb-1">Logs:</div>
               {exec.logs.slice(0, 3).map((log, idx) => (
-                <div key={idx} className="text-12" style={{ marginLeft: '8px' }}>
-                  <span className={log.level === 'error' ? 'text-red-500' : 'text-r-neutral-body'}>
+                <div key={idx} className="text-12 ml-8">
+                  <span
+                    className={
+                      log.level === 'error'
+                        ? 'text-r-red-default'
+                        : 'text-r-neutral-body'
+                    }
+                  >
                     [{log.level}] {log.message}
                   </span>
                 </div>
               ))}
               {exec.logs.length > 3 && (
-                <div className="text-r-neutral-foot text-12" style={{ marginLeft: '8px' }}>
+                <div className="text-r-neutral-foot text-12 ml-8">
                   +{exec.logs.length - 3} more logs
                 </div>
               )}
             </div>
           )}
-          {exec.transactionHashes && Object.keys(exec.transactionHashes).length > 0 && (
-            <div className="mt-2">
-              <div className="text-r-neutral-foot text-12 mb-1">Transactions:</div>
-              {Object.entries(exec.transactionHashes).map(([key, hash]) => (
-                <div key={key} className="text-12" style={{ marginLeft: '8px' }}>
-                  <span className="text-r-neutral-body">{key}: </span>
-                  <span className="text-r-blue-light">{hash.slice(0, 10)}…{hash.slice(-6)}</span>
+          {exec.transactionHashes &&
+            Object.keys(exec.transactionHashes).length > 0 && (
+              <div className="mt-2">
+                <div className="text-r-neutral-foot text-12 mb-1">
+                  Transactions:
                 </div>
-              ))}
-            </div>
-          )}
+                {Object.entries(exec.transactionHashes).map(([key, hash]) => (
+                  <div key={key} className="text-12 ml-8">
+                    <span className="text-r-neutral-body">{key}: </span>
+                    <span className="text-r-blue-light">
+                      {hash.slice(0, 10)}…{hash.slice(-6)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
         </div>
       ))}
     </div>

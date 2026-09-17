@@ -34,7 +34,8 @@
 
 import Safe from '@safe-global/protocol-kit';
 import { fetchRolesMod } from 'zodiac-roles-deployments';
-import { encodeFunctionData, type Hex } from 'viem';
+import { encodeFunctionData } from 'viem';
+import type { Hex } from 'viem';
 
 /**
  * Minimal shape of the EIP-1193 provider Rabby already exposes internally
@@ -46,7 +47,10 @@ import { encodeFunctionData, type Hex } from 'viem';
  * no relationship with.
  */
 export interface Eip1193Provider {
-  request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
+  request: (args: {
+    method: string;
+    params?: unknown[] | object;
+  }) => Promise<unknown>;
 }
 
 /**
@@ -174,7 +178,10 @@ export async function isRolesModifierEnabled(
       data: isModuleEnabledData,
     });
     // Booleans in Ethereum are uint256: 0x0...0 = false, 0x0...1 = true
-    return result === '0x0000000000000000000000000000000000000000000000000000000000000001';
+    return (
+      result ===
+      '0x0000000000000000000000000000000000000000000000000000000000000001'
+    );
   } catch (e) {
     return false;
   }

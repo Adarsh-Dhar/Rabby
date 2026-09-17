@@ -27,7 +27,7 @@ export const RabbyPointsPopup = ({ visible, onClose }: Props) => {
 
   return (
     <Popup
-      visible={visible}
+      open={visible}
       height={'fit-content'}
       onClose={onClose}
       push={false}

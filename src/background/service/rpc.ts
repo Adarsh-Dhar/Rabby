@@ -187,7 +187,10 @@ class RPCService {
         this.patchStore({ defaultRPC });
       }
     } catch (error) {
-      console.error('Failed to fetch default RPC:', error instanceof Error ? error.message : String(error));
+      console.error(
+        'Failed to fetch default RPC:',
+        error instanceof Error ? error.message : String(error)
+      );
     }
   };
 

@@ -83,7 +83,9 @@ interface LidoPositionData {
 }
 
 /** Reads the connected address's stETH balance (Ethereum mainnet only). */
-export const useLidoPosition = (address: string | undefined): LidoPositionData => {
+export const useLidoPosition = (
+  address: string | undefined
+): LidoPositionData => {
   const wallet = useWallet();
   const [data, setData] = useState<LidoPositionData>({
     stEthBalance: null,
@@ -111,7 +113,11 @@ export const useLidoPosition = (address: string | undefined): LidoPositionData =
         });
       } catch (error) {
         if (cancelled) return;
-        setData({ stEthBalance: null, loading: false, error: (error as Error).message });
+        setData({
+          stEthBalance: null,
+          loading: false,
+          error: (error as Error).message,
+        });
       }
     };
 
@@ -136,7 +142,9 @@ interface CowOpenOrdersData {
  * no wallet interaction. This does NOT create or manage orders; it only
  * surfaces whether the account has any live CoW orders for the Discovery view.
  */
-export const useCowOpenOrders = (address: string | undefined): CowOpenOrdersData => {
+export const useCowOpenOrders = (
+  address: string | undefined
+): CowOpenOrdersData => {
   const [data, setData] = useState<CowOpenOrdersData>({
     openOrderCount: null,
     loading: false,
@@ -162,7 +170,11 @@ export const useCowOpenOrders = (address: string | undefined): CowOpenOrdersData
         setData({ openOrderCount: openCount, loading: false, error: null });
       } catch (error) {
         if (cancelled) return;
-        setData({ openOrderCount: null, loading: false, error: (error as Error).message });
+        setData({
+          openOrderCount: null,
+          loading: false,
+          error: (error as Error).message,
+        });
       }
     };
 

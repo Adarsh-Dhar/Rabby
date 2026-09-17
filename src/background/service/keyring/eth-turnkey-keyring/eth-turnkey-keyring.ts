@@ -85,7 +85,9 @@ export class TurnkeyKeyring extends EventEmitter {
     }
     // TODO: Call Turnkey's createKey API
     // TODO: Return the generated address
-    throw new Error('generateKey not implemented - requires Turnkey SDK integration');
+    throw new Error(
+      'generateKey not implemented - requires Turnkey SDK integration'
+    );
   }
 
   /**
@@ -98,7 +100,10 @@ export class TurnkeyKeyring extends EventEmitter {
   /**
    * Deserialize the keyring state from storage.
    */
-  async deserialize(state: TurnkeyKeyringState, options?: DeserializeOption): Promise<void> {
+  async deserialize(
+    state: TurnkeyKeyringState,
+    options?: DeserializeOption
+  ): Promise<void> {
     this.state = state;
     if (state.credentials) {
       await this.init(state.credentials);
@@ -151,7 +156,9 @@ export class TurnkeyKeyring extends EventEmitter {
     }
     // TODO: Call Turnkey's signTransaction API
     // TODO: Return the signed transaction
-    throw new Error('signTransaction not implemented - requires Turnkey SDK integration');
+    throw new Error(
+      'signTransaction not implemented - requires Turnkey SDK integration'
+    );
   }
 
   /**
@@ -171,7 +178,9 @@ export class TurnkeyKeyring extends EventEmitter {
     }
     // TODO: Call Turnkey's signTypedData API
     // TODO: Return the signature
-    throw new Error('signTypedData not implemented - requires Turnkey SDK integration');
+    throw new Error(
+      'signTypedData not implemented - requires Turnkey SDK integration'
+    );
   }
 
   /**
@@ -191,7 +200,9 @@ export class TurnkeyKeyring extends EventEmitter {
     }
     // TODO: Call Turnkey's signMessage API
     // TODO: Return the signature
-    throw new Error('signMessage not implemented - requires Turnkey SDK integration');
+    throw new Error(
+      'signMessage not implemented - requires Turnkey SDK integration'
+    );
   }
 
   /**
@@ -203,7 +214,9 @@ export class TurnkeyKeyring extends EventEmitter {
       throw new Error('Turnkey credentials not initialized');
     }
     // TODO: Call Turnkey's getPolicy API
-    throw new Error('getPolicy not implemented - requires Turnkey SDK integration');
+    throw new Error(
+      'getPolicy not implemented - requires Turnkey SDK integration'
+    );
   }
 
   /**
@@ -215,7 +228,9 @@ export class TurnkeyKeyring extends EventEmitter {
       throw new Error('Turnkey credentials not initialized');
     }
     // TODO: Call Turnkey's updatePolicy API
-    throw new Error('updatePolicy not implemented - requires Turnkey SDK integration');
+    throw new Error(
+      'updatePolicy not implemented - requires Turnkey SDK integration'
+    );
   }
 }
 

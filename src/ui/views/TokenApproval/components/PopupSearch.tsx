@@ -79,7 +79,7 @@ const PopupSearch = ({ data, visible, onClose }: PopupSearchProps) => {
   }, [visible]);
   return (
     <Popup
-      visible={visible}
+      open={visible}
       onClose={onClose}
       title="Search"
       height={580}

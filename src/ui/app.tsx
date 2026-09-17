@@ -187,15 +187,12 @@ const checkSwAlive = () => {
       if (e.message === 'timeout') {
         console.log('[checkSwAlive] sw is inactive', e);
         Sentry.captureException(
-          'sw is inactive' +
-            (lastError ? ':' + lastError : '')
+          'sw is inactive' + (lastError ? ':' + lastError : '')
         );
       } else {
         console.log('[checkSwAlive] sw is dead');
         Sentry.captureMessage(
-          'sw is dead:' +
-            e.message +
-            (lastError ? ':' + lastError : '')
+          'sw is dead:' + e.message + (lastError ? ':' + lastError : '')
         );
       }
     });

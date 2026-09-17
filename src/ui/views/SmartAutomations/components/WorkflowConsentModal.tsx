@@ -56,8 +56,12 @@ export const WorkflowConsentModal: React.FC<WorkflowConsentModalProps> = ({
   const confirmDisabled =
     showApprovalControls && !allowUnlimited && !amountValid;
 
-  const title = diffs && diffs.length > 0 ? `Update ${workflowType}` : `Create ${workflowType}`;
-  const okText = diffs && diffs.length > 0 ? 'Update Automation' : 'Create Automation';
+  const title =
+    diffs && diffs.length > 0
+      ? `Update ${workflowType}`
+      : `Create ${workflowType}`;
+  const okText =
+    diffs && diffs.length > 0 ? 'Update Automation' : 'Create Automation';
 
   return (
     <Modal
@@ -79,7 +83,9 @@ export const WorkflowConsentModal: React.FC<WorkflowConsentModalProps> = ({
               <div className="text-r-neutral-foot text-12 mb-8">Changes</div>
               {diffs.map((diff, idx) => (
                 <div key={idx} className="mb-8 last:mb-0">
-                  <div className="text-r-neutral-foot text-12 mb-4">{diff.field}</div>
+                  <div className="text-r-neutral-foot text-12 mb-4">
+                    {diff.field}
+                  </div>
                   <div className="flex items-center gap-8">
                     <span className="text-r-red-default line-through text-14">
                       {diff.before}
@@ -105,7 +111,9 @@ export const WorkflowConsentModal: React.FC<WorkflowConsentModalProps> = ({
           <div className="text-r-neutral-title text-14">{summary.action}</div>
         </div>
         <div>
-          <div className="text-r-neutral-foot text-12 mb-4">Trigger Condition</div>
+          <div className="text-r-neutral-foot text-12 mb-4">
+            Trigger Condition
+          </div>
           <div className="text-r-neutral-title text-14">
             {summary.triggerCondition}
           </div>
@@ -118,7 +126,8 @@ export const WorkflowConsentModal: React.FC<WorkflowConsentModalProps> = ({
         {showApprovalControls && (
           <div className="border-t border-r-neutral-line pt-12 mt-4">
             <div className="text-r-neutral-foot text-12 mb-4">
-              Approval amount{summary.tokenSymbol ? ` (${summary.tokenSymbol})` : ''}
+              Approval amount
+              {summary.tokenSymbol ? ` (${summary.tokenSymbol})` : ''}
             </div>
             <Input
               placeholder="Amount this automation is allowed to spend"
@@ -145,7 +154,8 @@ export const WorkflowConsentModal: React.FC<WorkflowConsentModalProps> = ({
             )}
             {!allowUnlimited && !amountValid && (
               <div className="text-r-red-default text-12 mt-4">
-                Enter a valid amount to continue, or check "allow unlimited" above.
+                Enter a valid amount to continue, or check "allow unlimited"
+                above.
               </div>
             )}
           </div>

@@ -65,7 +65,7 @@ const CoinSelectPopup: React.FC<{
 
   return (
     <Popup
-      visible={visible}
+      open={visible}
       onCancel={onCancel}
       height={sheetHeight}
       isSupportDarkMode

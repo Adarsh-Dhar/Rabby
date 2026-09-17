@@ -854,7 +854,7 @@ const GasSelectorHeader = ({
                   </div>
                   <Tooltip
                     overlayClassName="rectangle max-w-max"
-                    visible={isGasAccountHovering}
+                    open={isGasAccountHovering}
                     title={
                       <>
                         <div>{t('page.signTx.gasAccount.description')}</div>
@@ -1232,7 +1232,7 @@ export const GasMethod = (props: {
     <Tooltip
       overlayClassName="rectangle"
       title={tips}
-      visible={tips ? undefined : false}
+      open={tips ? undefined : false}
       placement="topLeft"
       align={{
         offset: [-4, 0],

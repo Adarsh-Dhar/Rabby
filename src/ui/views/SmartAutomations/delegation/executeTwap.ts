@@ -8,8 +8,9 @@ import {
   buildTwapCreateTransaction,
   assertSafeReadyForComposableCow,
   getComposableCowDeployment,
-  type Eip1193Provider,
 } from './cowTwap';
+
+import type { Eip1193Provider } from './cowTwap';
 
 export interface TwapExecutionParams {
   sellToken: string;
@@ -22,7 +23,12 @@ export interface TwapExecutionParams {
   chainId: number;
   viemChain: { id: number; name: string; nativeCurrency: any; rpcUrls: any };
   rpcProvider: Eip1193Provider;
-  sendTransaction: (tx: { from: string; to: string; value: string; data: string }) => Promise<string>;
+  sendTransaction: (tx: {
+    from: string;
+    to: string;
+    value: string;
+    data: string;
+  }) => Promise<string>;
 }
 
 export interface TwapExecutionResult {
@@ -76,7 +82,8 @@ export async function executeRealTwap(
       return {
         success: false,
         usedFallback: true,
-        fallbackReason: readyCheck.reason || 'Safe not configured for ComposableCoW',
+        fallbackReason:
+          readyCheck.reason || 'Safe not configured for ComposableCoW',
       };
     }
 
@@ -90,7 +97,8 @@ export async function executeRealTwap(
         totalBuyAmountMin,
         numParts,
         partDurationSeconds,
-        appData: '0x0000000000000000000000000000000000000000000000000000000000000000', // Default appData (bytes32)
+        appData:
+          '0x0000000000000000000000000000000000000000000000000000000000000000', // Default appData (bytes32)
       },
       chainId,
       { provider: rpcProvider, viemChain }

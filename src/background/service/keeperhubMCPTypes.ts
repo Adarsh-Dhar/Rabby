@@ -124,7 +124,16 @@ export interface CheckAndExecuteParams {
   abi: string;
   function_name: string;
   function_args?: unknown[];
-  operator: 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'contains' | 'startsWith' | 'endsWith';
+  operator:
+    | 'eq'
+    | 'neq'
+    | 'gt'
+    | 'gte'
+    | 'lt'
+    | 'lte'
+    | 'contains'
+    | 'startsWith'
+    | 'endsWith';
   comparison_value: string | number;
   action_params: TransferParams | ContractCallParams;
   simulate?: boolean;

@@ -1,9 +1,13 @@
 import React, { useState, useCallback } from 'react';
-import { Input, Button, Card, Alert, Spin, Divider, Tag } from 'antd';
-import { SendOutlined, CheckOutlined, CloseOutlined, LoadingOutlined } from '@ant-design/icons';
+import { Input, Button, Card, Alert, Spin } from 'antd';
+import {
+  SendOutlined,
+  CheckOutlined,
+  CloseOutlined,
+  LoadingOutlined,
+} from '@ant-design/icons';
 import { useWallet } from '@/ui/utils';
 import { useCurrentAccount } from '@/ui/hooks/backgroundState/useAccount';
-import type { MCPWorkflowNode, MCPWorkflowEdge } from 'background/service/keeperhubMCP';
 import type { DraftDefinition } from './index';
 
 const { TextArea } = Input;
@@ -12,7 +16,9 @@ interface ChatPaneProps {
   workflowId?: string;
   chainId: number;
   messages: { role: 'user' | 'model'; text: string }[];
-  onMessagesChange: (messages: { role: 'user' | 'model'; text: string }[]) => void;
+  onMessagesChange: (
+    messages: { role: 'user' | 'model'; text: string }[]
+  ) => void;
   onProposal: (proposal: DraftDefinition) => void;
   draftDefinition: DraftDefinition;
   pendingProposal: DraftDefinition | null;
@@ -44,7 +50,10 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
     setInput('');
     setError(null);
 
-    const newMessages = [...messages, { role: 'user' as const, text: userMessage }];
+    const newMessages = [
+      ...messages,
+      { role: 'user' as const, text: userMessage },
+    ];
     onMessagesChange(newMessages);
 
     try {
@@ -86,14 +95,26 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [input, messages, workflowId, chainId, wallet, account, onMessagesChange, onProposal]);
+  }, [
+    input,
+    messages,
+    workflowId,
+    chainId,
+    wallet,
+    account,
+    onMessagesChange,
+    onProposal,
+  ]);
 
-  const handleKeyPress = useCallback((e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  }, [handleSend]);
+  const handleKeyPress = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSend();
+      }
+    },
+    [handleSend]
+  );
 
   const renderDiff = useCallback(() => {
     if (!pendingProposal) return null;
@@ -110,7 +131,10 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
     }
 
     // Check nodes change
-    if (JSON.stringify(pendingProposal.nodes) !== JSON.stringify(draftDefinition.nodes)) {
+    if (
+      JSON.stringify(pendingProposal.nodes) !==
+      JSON.stringify(draftDefinition.nodes)
+    ) {
       changes.push({
         field: 'Nodes',
         before: `${draftDefinition.nodes.length} nodes`,
@@ -119,7 +143,10 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
     }
 
     // Check edges change
-    if (JSON.stringify(pendingProposal.edges) !== JSON.stringify(draftDefinition.edges)) {
+    if (
+      JSON.stringify(pendingProposal.edges) !==
+      JSON.stringify(draftDefinition.edges)
+    ) {
       changes.push({
         field: 'Edges',
         before: `${draftDefinition.edges.length} edges`,
@@ -142,7 +169,9 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
       <Card title="Proposed Changes" size="small" className="mb-16">
         {changes.map((change, idx) => (
           <div key={idx} className="mb-8 last:mb-0">
-            <div className="text-r-neutral-foot text-12 mb-4">{change.field}</div>
+            <div className="text-r-neutral-foot text-12 mb-4">
+              {change.field}
+            </div>
             <div className="flex items-center gap-8">
               <span className="text-r-red-default line-through text-14">
                 {change.before}
@@ -164,8 +193,10 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
       <div className="min-h-0 flex-1 overflow-y-auto">
         {messages.length === 0 && (
           <div className="text-center text-r-neutral-foot py-32">
-            <div className="text-16 mb-8">Start building your workflow</div>
-            <div className="text-14">
+            <div className="text-16 font-medium mb-8">
+              Start building your workflow
+            </div>
+            <div className="text-14 text-r-neutral-body">
               Describe what you want to automate, and I'll help you create it.
               <br />
               For example: "Create a liquidation shield for my Aave position"
@@ -224,12 +255,14 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
           <div className="flex gap-8 mt-16">
             <Button
               type="primary"
+              size="small"
               icon={<CheckOutlined />}
               onClick={onApplyProposal}
             >
               Apply Changes
             </Button>
             <Button
+              size="small"
               icon={<CloseOutlined />}
               onClick={onRejectProposal}
             >
@@ -252,6 +285,7 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
           />
           <Button
             type="primary"
+            size="small"
             icon={<SendOutlined />}
             onClick={handleSend}
             disabled={!input.trim() || loading}

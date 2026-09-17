@@ -593,12 +593,18 @@ const KeeperhubModal = ({
 
   const handleSubmit = async ({ apiKey }: { apiKey: string }) => {
     try {
+      console.log(
+        'Setting KeeperHub API key:',
+        apiKey ? '***' + apiKey.slice(-4) : 'empty'
+      );
       await wallet.setKeeperhubApiKey(apiKey);
+      console.log('KeeperHub API key set successfully');
       setIsVisible(false);
       setTimeout(() => {
         onFinish();
       }, 500);
     } catch (error) {
+      console.error('Failed to set KeeperHub API key:', error);
       message.error(
         (error as Error)?.message || 'Failed to set KeeperHub API key'
       );
@@ -644,8 +650,8 @@ const KeeperhubModal = ({
           />
         </Form.Item>
         <div className="text-13 text-r-neutral-body mb-16">
-          Connect your KeeperHub API key to enable Automations like
-          liquidation shields and yield harvesters.
+          Connect your KeeperHub API key to enable Automations like liquidation
+          shields and yield harvesters.
         </div>
         <div className="flex justify-center mt-24 popup-footer">
           <Button
@@ -1939,7 +1945,7 @@ const Settings = (props: SettingsProps) => {
   return (
     <>
       <Popup
-        visible={visible}
+        open={visible}
         onClose={onClose}
         height={488}
         push={false}

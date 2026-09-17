@@ -429,7 +429,7 @@ export const BridgeSlippage = memo((props: BridgeSlippageProps) => {
       <SlippagePopup
         visible={popupVisible}
         onCancel={closePopup}
-        afterVisibleChange={handleAfterVisibleChange}
+        afterOpenChange={handleAfterVisibleChange}
         height="fit-content"
         bodyStyle={{ padding: 0 }}
         closable={false}
