@@ -154,7 +154,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
   };
 
   return (
-    <div className="flex min-h-0 flex-col h-full gap-16 overflow-y-auto p-16">
+    <div className="flex min-h-0 flex-col h-full gap-16 overflow-y-auto bg-r-neutral-bg p-20">
       {/* Basic Info */}
       <div className="bg-r-neutral-card rounded-8 p-16">
         <div className="text-r-neutral-title text-14 font-medium mb-12">
@@ -188,14 +188,16 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
       </div>
 
       {/* Nodes */}
-      <div className="bg-r-neutral-card rounded-8 p-16 border border-r-neutral-line">
-        <div className="flex items-center justify-between mb-12">
+      <div className="rounded-8 border border-r-neutral-line bg-r-neutral-card p-16">
+        <div className="mb-16 flex items-center justify-between gap-12">
           <div>
             <div className="text-r-neutral-title text-14 font-medium">
               Nodes
             </div>
             <div className="text-r-neutral-foot text-12 mt-4">
-              {definition.nodes.length} {definition.nodes.length === 1 ? 'step' : 'steps'} in this workflow
+              {definition.nodes.length}{' '}
+              {definition.nodes.length === 1 ? 'step' : 'steps'} in this
+              workflow
             </div>
           </div>
           <Button
@@ -207,97 +209,111 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
             Add node
           </Button>
         </div>
-        <div className="flex flex-col gap-12">
-          {definition.nodes.map((node: WorkflowNode, index: number) => (
-            <Collapse key={node.id}>
-              <Panel
-                header={
-                  <div className="flex items-center justify-between">
-                    <span className="flex items-center gap-8">
-                      <Tag
-                        color={
-                          node.type === 'trigger'
-                            ? 'blue'
-                            : node.type === 'action'
-                            ? 'green'
-                            : 'orange'
-                        }
-                      >
-                        {node.type}
-                      </Tag>
-                      <span>{node.data?.label || node.id}</span>
-                    </span>
-                    <Button
-                      type="text"
-                      size="small"
-                      danger
-                      icon={
-                        <ThemeIcon src={RcIconDelete} className="w-14 h-14" />
-                      }
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeNode(index);
-                      }}
-                    />
-                  </div>
-                }
+        {definition.nodes.length === 0 ? (
+          <div className="rounded-6 border border-dashed border-r-neutral-line bg-r-neutral-card-1 px-16 py-24 text-center">
+            <div className="text-r-neutral-title text-14 font-medium">
+              No nodes yet
+            </div>
+            <div className="mt-4 text-r-neutral-foot text-12">
+              Add a trigger or action to start building this workflow.
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-col gap-12">
+            {definition.nodes.map((node: WorkflowNode, index: number) => (
+              <Collapse
                 key={node.id}
+                className="overflow-hidden rounded-8 border border-r-neutral-line bg-r-neutral-card"
               >
-                <div className="flex flex-col gap-12">
-                  <div className="flex gap-8">
-                    <div className="flex-1">
-                      <div className="text-r-neutral-foot text-12 mb-4">
-                        Label
-                      </div>
-                      <Input
-                        value={node.data?.label || ''}
-                        onChange={(e) =>
-                          handleNodeDataChange(index, 'label', e.target.value)
+                <Panel
+                  header={
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-8">
+                        <Tag
+                          color={
+                            node.type === 'trigger'
+                              ? 'blue'
+                              : node.type === 'action'
+                              ? 'green'
+                              : 'orange'
+                          }
+                        >
+                          {node.type}
+                        </Tag>
+                        <span>{node.data?.label || node.id}</span>
+                      </span>
+                      <Button
+                        type="text"
+                        size="small"
+                        danger
+                        icon={
+                          <ThemeIcon src={RcIconDelete} className="w-14 h-14" />
                         }
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeNode(index);
+                        }}
+                      />
+                    </div>
+                  }
+                  key={node.id}
+                >
+                  <div className="flex flex-col gap-12">
+                    <div className="flex gap-8">
+                      <div className="flex-1">
+                        <div className="text-r-neutral-foot text-12 mb-4">
+                          Label
+                        </div>
+                        <Input
+                          value={node.data?.label || ''}
+                          onChange={(e) =>
+                            handleNodeDataChange(index, 'label', e.target.value)
+                          }
+                          size="small"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-r-neutral-foot text-12 mb-4">
+                          Type
+                        </div>
+                        <Input
+                          value={node.data?.type || ''}
+                          onChange={(e) =>
+                            handleNodeDataChange(index, 'type', e.target.value)
+                          }
+                          size="small"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-r-neutral-foot text-12 mb-4">
+                        Description
+                      </div>
+                      <TextArea
+                        value={node.data?.description || ''}
+                        onChange={(e) =>
+                          handleNodeDataChange(
+                            index,
+                            'description',
+                            e.target.value
+                          )
+                        }
+                        autoSize={{ minRows: 1, maxRows: 3 }}
                         size="small"
                       />
                     </div>
-                    <div className="flex-1">
+                    <div>
                       <div className="text-r-neutral-foot text-12 mb-4">
-                        Type
+                        Config
                       </div>
-                      <Input
-                        value={node.data?.type || ''}
-                        onChange={(e) =>
-                          handleNodeDataChange(index, 'type', e.target.value)
-                        }
-                        size="small"
-                      />
+                      {renderNodeConfig(node, index)}
                     </div>
                   </div>
-                  <div>
-                    <div className="text-r-neutral-foot text-12 mb-4">
-                      Description
-                    </div>
-                    <TextArea
-                      value={node.data?.description || ''}
-                      onChange={(e) =>
-                        handleNodeDataChange(
-                          index,
-                          'description',
-                          e.target.value
-                        )
-                      }
-                      autoSize={{ minRows: 1, maxRows: 3 }}
-                      size="small"
-                    />
-                  </div>
-                  <div>
-                    <div className="text-r-neutral-foot text-12 mb-4">
-                      Config
-                    </div>
-                    {renderNodeConfig(node, index)}
-                  </div>
-                </div>
-              </Panel>
-            </Collapse>
-          ))}
-        </div>
+                </Panel>
+              </Collapse>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Edges */}
