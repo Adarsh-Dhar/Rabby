@@ -12,6 +12,13 @@ import type { DraftDefinition } from './index';
 
 const { TextArea } = Input;
 
+// Same wrapper contract as ProjectEditor's header/tab bar: px-20 on this
+// component's own root, then a centered column capped at 1180px via
+// inline style (not the `max-w-[1180px]` bracket class this file used
+// before — that class wasn't visually constraining anything, which is
+// exactly why this content didn't line up with the header above it).
+const centeredColumnStyle: React.CSSProperties = { maxWidth: 1180 };
+
 interface ChatPaneProps {
   workflowId?: string;
   chainId: number;
@@ -194,7 +201,10 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
 
   return (
     <div className="flex min-h-0 h-full flex-col overflow-hidden bg-r-neutral-bg px-20 py-20">
-      <div className="mx-auto flex min-h-0 w-full max-w-[1180px] flex-1 flex-col gap-16">
+      <div
+        className="mx-auto flex min-h-0 w-full flex-1 flex-col gap-16"
+        style={centeredColumnStyle}
+      >
         {/* Chat Messages */}
         <div className="min-h-[220px] flex-1 overflow-y-auto rounded-8 border border-r-neutral-line bg-r-neutral-card p-20">
           {messages.length === 0 && (
@@ -292,9 +302,8 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
             <Button
               type="primary"
               size="small"
-              icon={<SendOutlined />}
+              className="h-32 min-w-[142px] shrink-0 whitespace-nowrap px-14"
               onClick={handleSend}
-              disabled={!input.trim() || loading}
             >
               Generate
             </Button>

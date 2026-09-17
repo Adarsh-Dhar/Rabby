@@ -217,7 +217,7 @@ const SmartAutomations = () => {
           <Button
             type="primary"
             size="middle"
-            icon={<ThemeIcon src={RcIconPlus} className="w-12 h-12" />}
+            className="h-32 min-w-[142px] shrink-0 whitespace-nowrap px-14"
             onClick={handleCreateNew}
           >
             New automation

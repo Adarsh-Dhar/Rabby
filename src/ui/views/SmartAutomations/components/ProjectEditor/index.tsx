@@ -386,11 +386,28 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
     );
   }
 
+  // Every row that needs to left/right-align with every other row — the
+  // header title+buttons, the tab bar labels, and (already, inside
+  // ChatPane/FormPane themselves) the panel content — shares this exact
+  // wrapper: px-20 on the outer edge, then a centered column capped at
+  // 1180px. maxWidth is set via inline style rather than the Tailwind
+  // `max-w-[1180px]` bracket class: that class is what ChatPane and
+  // FormPane already use, and per the last screenshot it isn't visually
+  // constraining anything, which means their content currently isn't
+  // centered either — an inline style can't be dropped by a purge/content
+  // config the way an arbitrary-value utility class can, so this is the
+  // one part of the layout guaranteed to actually match across all three
+  // once it's applied consistently.
+  const centeredColumnStyle: React.CSSProperties = { maxWidth: 1180 };
+
   return (
     <div className="flex min-h-0 h-full flex-col overflow-hidden bg-r-neutral-bg">
       {/* Header */}
-      <div className="flex min-h-[72px] shrink-0 items-center justify-between gap-16 border-b border-r-neutral-line bg-r-neutral-card px-20 py-14">
-        <div className="mx-auto flex w-full max-w-[1180px] items-center justify-between gap-16">
+      <div className="flex min-h-[72px] shrink-0 items-center border-b border-r-neutral-line bg-r-neutral-card px-20 py-14">
+        <div
+          className="mx-auto flex w-full items-center justify-between gap-16"
+          style={centeredColumnStyle}
+        >
           <div className="flex min-w-0 items-center gap-12">
             <div className="min-w-0">
               <h2 className="text-r-neutral-title text-16 font-medium truncate">
@@ -413,7 +430,6 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
               type="primary"
               size="small"
               className="h-32 min-w-[142px] shrink-0 whitespace-nowrap px-14"
-              icon={<ThemeIcon src={RcIconCheck} className="w-14 h-14" />}
               onClick={handleConfirmSave}
               disabled={
                 !draftDefinition.name || draftDefinition.nodes.length === 0
@@ -428,9 +444,20 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
       {/* Editor Content */}
       <div className="flex min-h-0 flex-1 overflow-hidden">
         <Tabs
-          className="flex h-full min-h-0 w-full flex-col"
+          className="flex h-full min-h-0 w-full flex-col smart-automations-editor-tabs"
           activeKey={mode}
           onChange={(key) => setMode(key as EditorMode)}
+          // Wrap the default tab bar in the exact same px-20 + centered
+          // 1180px column as the header, instead of a flat pixel padding —
+          // a flat value only lines up with the centered content at one
+          // specific window width, and drifts everywhere else.
+          renderTabBar={(tabBarProps, DefaultTabBar) => (
+            <div className="px-20">
+              <div className="mx-auto w-full" style={centeredColumnStyle}>
+                <DefaultTabBar {...tabBarProps} />
+              </div>
+            </div>
+          )}
           items={[
             {
               key: 'chat',

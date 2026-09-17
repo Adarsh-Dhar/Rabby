@@ -20,4 +20,13 @@
     display: inline-flex;
     align-items: center;
   }
+
+  .ant-btn .anticon {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .ant-btn svg {
+    vertical-align: middle;
+  }
 }

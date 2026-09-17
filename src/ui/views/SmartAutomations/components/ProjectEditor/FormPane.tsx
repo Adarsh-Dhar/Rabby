@@ -8,6 +8,12 @@ import type { DraftDefinition } from './index';
 const { TextArea } = Input;
 const { Panel } = Collapse;
 
+// Same wrapper contract as ProjectEditor's header/tab bar and ChatPane:
+// px-20 on this component's own root, then a centered column capped at
+// 1180px via inline style rather than the `max-w-[1180px]` bracket class
+// this file used before.
+const centeredColumnStyle: React.CSSProperties = { maxWidth: 1180 };
+
 interface NodeData {
   label?: string;
   type?: string;
@@ -155,7 +161,10 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
 
   return (
     <div className="flex min-h-0 h-full flex-col overflow-y-auto bg-r-neutral-bg px-20 py-20">
-      <div className="mx-auto flex w-full max-w-[1180px] flex-col gap-16">
+      <div
+        className="mx-auto flex w-full flex-col gap-16"
+        style={centeredColumnStyle}
+      >
         {/* Basic Info */}
         <div className="rounded-8 border border-r-neutral-line bg-r-neutral-card p-16">
           <div className="text-r-neutral-title text-14 font-medium mb-12">
@@ -204,10 +213,10 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
             <Button
               type="primary"
               size="small"
-              icon={<ThemeIcon src={RcIconPlus} className="w-14 h-14" />}
+              className="h-32 min-w-[142px] shrink-0 whitespace-nowrap px-14"
               onClick={addNode}
             >
-              Add node
+              Add Node
             </Button>
           </div>
           {definition.nodes.length === 0 ? (
@@ -335,11 +344,10 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
               Edges ({definition.edges.length})
             </div>
             <Button
-              type="text"
+              type="primary"
               size="small"
-              icon={<ThemeIcon src={RcIconPlus} className="w-14 h-14" />}
+              className="h-32 min-w-[142px] shrink-0 whitespace-nowrap px-14"
               onClick={addEdge}
-              disabled={definition.nodes.length < 2}
             >
               Add Edge
             </Button>
