@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { lazy, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PrivateRoute, PrivateRouteGuard } from 'ui/component';
 
@@ -19,7 +19,7 @@ import { useMemoizedFn } from 'ahooks';
 import { useContactBookStore } from '@/ui/state/contactBook';
 import { DesktopSmallSwap } from './DesktopSmallSwap';
 import { DesktopManageApprovals } from './DesktopManageApprovals';
-import SmartAutomations from './SmartAutomations/screen/home';
+const SmartAutomations = lazy(() => import('./SmartAutomations/screen/home'));
 
 declare global {
   interface Window {
