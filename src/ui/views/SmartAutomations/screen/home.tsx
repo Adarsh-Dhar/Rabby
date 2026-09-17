@@ -209,7 +209,7 @@ const SmartAutomations = () => {
   }
 
   return (
-    <div className="min-h-full bg-r-neutral-bg p-20">
+    <div className="min-h-full bg-r-neutral-bg px-20 py-20">
       <PageHeader
         canBack={false}
         className="mb-16"

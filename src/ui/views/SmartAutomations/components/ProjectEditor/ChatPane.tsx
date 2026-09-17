@@ -193,113 +193,115 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
   }, [pendingProposal, draftDefinition]);
 
   return (
-    <div className="flex min-h-0 flex-col h-full gap-16 overflow-hidden bg-r-neutral-bg p-20">
-      {/* Chat Messages */}
-      <div className="min-h-0 flex-1 overflow-y-auto rounded-8 border border-r-neutral-line bg-r-neutral-card p-20">
-        {messages.length === 0 && (
-          <div className="text-center text-r-neutral-foot py-32">
-            <div className="text-16 font-medium mb-8">
-              Start building your workflow
+    <div className="flex min-h-0 h-full flex-col overflow-hidden bg-r-neutral-bg px-20 py-20">
+      <div className="mx-auto flex min-h-0 w-full max-w-[1180px] flex-1 flex-col gap-16">
+        {/* Chat Messages */}
+        <div className="min-h-[220px] flex-1 overflow-y-auto rounded-8 border border-r-neutral-line bg-r-neutral-card p-20">
+          {messages.length === 0 && (
+            <div className="text-center text-r-neutral-foot py-32">
+              <div className="text-16 font-medium mb-8">
+                Start building your workflow
+              </div>
+              <div className="text-14 text-r-neutral-body">
+                Describe what you want to automate, and I'll help you create it.
+                <br />
+                For example: "Create a liquidation shield for my Aave position"
+              </div>
             </div>
-            <div className="text-14 text-r-neutral-body">
-              Describe what you want to automate, and I'll help you create it.
-              <br />
-              For example: "Create a liquidation shield for my Aave position"
-            </div>
-          </div>
-        )}
+          )}
 
-        {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`mb-16 ${
-              msg.role === 'user' ? 'text-right' : 'text-left'
-            }`}
-          >
+          {messages.map((msg, idx) => (
             <div
-              className={`inline-block max-w-[80%] p-12 rounded-8 ${
-                msg.role === 'user'
-                  ? 'bg-r-blue-light bg-opacity-10 text-r-blue-title'
-                  : 'bg-r-neutral-card text-r-neutral-title'
+              key={idx}
+              className={`mb-16 ${
+                msg.role === 'user' ? 'text-right' : 'text-left'
               }`}
             >
-              <div className="text-14">{msg.text}</div>
+              <div
+                className={`inline-block max-w-[80%] p-12 rounded-8 ${
+                  msg.role === 'user'
+                    ? 'bg-r-blue-light bg-opacity-10 text-r-blue-title'
+                    : 'bg-r-neutral-card text-r-neutral-title'
+                }`}
+              >
+                <div className="text-14">{msg.text}</div>
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
-        {loading && (
-          <div className="text-left mb-16">
-            <div className="inline-block p-12 rounded-8 bg-r-neutral-card">
-              <Spin indicator={<LoadingOutlined spin />} size="small" />
-              <span className="ml-8 text-r-neutral-foot text-14">
-                Generating workflow...
-              </span>
+          {loading && (
+            <div className="text-left mb-16">
+              <div className="inline-block p-12 rounded-8 bg-r-neutral-card">
+                <Spin indicator={<LoadingOutlined spin />} size="small" />
+                <span className="ml-8 text-r-neutral-foot text-14">
+                  Generating workflow...
+                </span>
+              </div>
+            </div>
+          )}
+
+          {error && (
+            <Alert
+              message="Generation failed"
+              description={error}
+              type="error"
+              showIcon
+              closable
+              onClose={() => setError(null)}
+              className="mb-16"
+            />
+          )}
+        </div>
+
+        {/* Pending Proposal */}
+        {pendingProposal && (
+          <div className="border-t border-r-neutral-line pt-16">
+            {renderDiff()}
+
+            <div className="flex gap-8 mt-16">
+              <Button
+                type="primary"
+                size="small"
+                icon={<CheckOutlined />}
+                onClick={onApplyProposal}
+              >
+                Apply Changes
+              </Button>
+              <Button
+                size="small"
+                icon={<CloseOutlined />}
+                onClick={onRejectProposal}
+              >
+                Discard
+              </Button>
             </div>
           </div>
         )}
 
-        {error && (
-          <Alert
-            message="Generation failed"
-            description={error}
-            type="error"
-            showIcon
-            closable
-            onClose={() => setError(null)}
-            className="mb-16"
-          />
-        )}
-      </div>
-
-      {/* Pending Proposal */}
-      {pendingProposal && (
-        <div className="border-t border-r-neutral-line pt-16">
-          {renderDiff()}
-
-          <div className="flex gap-8 mt-16">
+        {/* Input Area */}
+        <div className="rounded-8 border border-r-neutral-line bg-r-neutral-card p-12">
+          <div className="flex items-end gap-8">
+            <TextArea
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyPress={handleKeyPress}
+              placeholder="Describe your workflow..."
+              autoSize={{ minRows: 2, maxRows: 4 }}
+              disabled={loading}
+            />
             <Button
               type="primary"
               size="small"
-              icon={<CheckOutlined />}
-              onClick={onApplyProposal}
+              icon={<SendOutlined />}
+              onClick={handleSend}
+              disabled={!input.trim() || loading}
             >
-              Apply Changes
-            </Button>
-            <Button
-              size="small"
-              icon={<CloseOutlined />}
-              onClick={onRejectProposal}
-            >
-              Discard
+              Generate
             </Button>
           </div>
-        </div>
-      )}
-
-      {/* Input Area */}
-      <div className="rounded-8 border border-r-neutral-line bg-r-neutral-card p-12">
-        <div className="flex items-end gap-8">
-          <TextArea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Describe your workflow..."
-            autoSize={{ minRows: 2, maxRows: 4 }}
-            disabled={loading}
-          />
-          <Button
-            type="primary"
-            size="small"
-            icon={<SendOutlined />}
-            onClick={handleSend}
-            disabled={!input.trim() || loading}
-          >
-            Generate
-          </Button>
-        </div>
-        <div className="text-r-neutral-foot text-12 mt-8">
-          Press Enter to send, Shift+Enter for new line
+          <div className="text-r-neutral-foot text-12 mt-8">
+            Press Enter to send, Shift+Enter for new line
+          </div>
         </div>
       </div>
     </div>
