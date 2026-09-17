@@ -193,9 +193,9 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
   }, [pendingProposal, draftDefinition]);
 
   return (
-    <div className="flex min-h-0 flex-col h-full gap-16 p-16">
+    <div className="flex min-h-0 flex-col h-full gap-16 overflow-hidden bg-r-neutral-bg p-20">
       {/* Chat Messages */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-8 border border-r-neutral-line bg-r-neutral-card p-20">
         {messages.length === 0 && (
           <div className="text-center text-r-neutral-foot py-32">
             <div className="text-16 font-medium mb-8">
@@ -278,8 +278,8 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
       )}
 
       {/* Input Area */}
-      <div className="border-t border-r-neutral-line pt-16">
-        <div className="flex gap-8">
+      <div className="rounded-8 border border-r-neutral-line bg-r-neutral-card p-12">
+        <div className="flex items-end gap-8">
           <TextArea
             value={input}
             onChange={(e) => setInput(e.target.value)}

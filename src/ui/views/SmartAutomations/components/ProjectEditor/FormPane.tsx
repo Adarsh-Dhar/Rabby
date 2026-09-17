@@ -154,7 +154,7 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
   };
 
   return (
-    <div className="flex min-h-0 flex-col h-full gap-16 overflow-y-auto p-16">
+    <div className="flex min-h-0 flex-col h-full gap-16 overflow-y-auto bg-r-neutral-bg p-20">
       {/* Basic Info */}
       <div className="bg-r-neutral-card rounded-8 p-16">
         <div className="text-r-neutral-title text-14 font-medium mb-12">
@@ -195,7 +195,9 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
               Nodes
             </div>
             <div className="text-r-neutral-foot text-12 mt-4">
-              {definition.nodes.length} {definition.nodes.length === 1 ? 'step' : 'steps'} in this workflow
+              {definition.nodes.length}{' '}
+              {definition.nodes.length === 1 ? 'step' : 'steps'} in this
+              workflow
             </div>
           </div>
           <Button
@@ -209,7 +211,10 @@ export const FormPane: React.FC<FormPaneProps> = ({ definition, onChange }) => {
         </div>
         <div className="flex flex-col gap-12">
           {definition.nodes.map((node: WorkflowNode, index: number) => (
-            <Collapse key={node.id}>
+            <Collapse
+              key={node.id}
+              className="overflow-hidden rounded-8 border border-r-neutral-line bg-r-neutral-card"
+            >
               <Panel
                 header={
                   <div className="flex items-center justify-between">
