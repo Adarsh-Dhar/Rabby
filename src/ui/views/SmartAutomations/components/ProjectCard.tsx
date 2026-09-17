@@ -66,11 +66,12 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
 
   return (
     <Card
-      className="border-r-neutral-line hover:border-r-neutral-foot transition-colors"
+      className="h-full border-r-neutral-line hover:border-r-neutral-foot transition-colors"
+      bodyStyle={{ padding: 16 }}
       loading={loading}
     >
-      <div className="flex flex-col gap-8">
-        <div className="flex justify-between items-start">
+      <div className="flex flex-col gap-16 h-full">
+        <div className="flex justify-between items-start gap-12">
           <div className="flex-1 min-w-0">
             <div className="text-r-neutral-title text-16 font-medium mb-4 truncate">
               {workflow.name}
@@ -82,7 +83,9 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             )}
             <div className="text-r-neutral-foot text-12">{workflow.type}</div>
           </div>
-          <div className={`text-12 font-medium ${getStatusColor()} ml-8`}>
+          <div
+            className={`shrink-0 rounded-4 px-8 py-4 text-12 font-medium ${getStatusColor()}`}
+          >
             {getStatusText()}
           </div>
         </div>
