@@ -387,9 +387,9 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
   }
 
   return (
-    <div className="flex min-h-0 flex-col h-full overflow-hidden bg-r-neutral-bg">
+    <div className="flex min-h-0 h-full flex-col overflow-hidden bg-r-neutral-bg">
       {/* Header */}
-      <div className="flex min-h-[72px] items-center justify-between px-20 py-14 border-b border-r-neutral-line flex-shrink-0 bg-r-neutral-card">
+      <div className="flex min-h-[72px] shrink-0 items-center justify-between gap-16 border-b border-r-neutral-line bg-r-neutral-card px-24 py-16">
         <div className="flex min-w-0 items-center gap-12">
           <div className="min-w-0">
             <h2 className="text-r-neutral-title text-16 font-medium truncate">
@@ -403,7 +403,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
         <div className="flex items-center gap-8 shrink-0 ml-12">
           <Button
             size="small"
-            className="shrink-0 whitespace-nowrap"
+            className="h-32 shrink-0 whitespace-nowrap px-12"
             onClick={onCancel}
           >
             Cancel
@@ -411,7 +411,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
           <Button
             type="primary"
             size="small"
-            className="shrink-0 whitespace-nowrap"
+            className="h-32 shrink-12 whitespace-nowrap px-14"
             icon={<ThemeIcon src={RcIconCheck} className="w-14 h-14" />}
             onClick={handleConfirmSave}
             disabled={
