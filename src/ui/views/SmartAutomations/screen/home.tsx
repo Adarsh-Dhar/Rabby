@@ -17,8 +17,25 @@ import { useAaveHealthFactor } from '../hooks/useAaveHealthFactor';
 const SmartAutomations = () => {
   const wallet = useWallet();
   const account = useCurrentAccount();
-  const [workflows, setWorkflows] = useState<WorkflowRow[]>([]);
-  const [hasApiKey, setHasApiKey] = useState(false);
+  const [workflows, setWorkflows] = useState<WorkflowRow[]>([
+    {
+      workflowId: 'demo-health-factor',
+      name: 'Protect Aave position',
+      description: 'Repay debt when health factor drops below 1.25',
+      type: 'health-factor',
+      lastKnownStatus: 'active',
+      createdAt: Date.now() - 86400000 * 4,
+    },
+    {
+      workflowId: 'demo-dca',
+      name: 'Weekly ETH buy',
+      description: 'Swap 50 USDC for ETH every Monday',
+      type: 'twap',
+      lastKnownStatus: 'paused',
+      createdAt: Date.now() - 86400000 * 9,
+    },
+  ]);
+  const [hasApiKey, setHasApiKey] = useState(true);
   const [selectedChain, setSelectedChain] = useState<ChainContracts | null>(
     null
   );

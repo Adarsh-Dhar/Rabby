@@ -8,7 +8,7 @@ const path = require('path');
 const config = require('./webpack.hot.config.js');
 
 const app = express();
-const port = 3173;
+const port = Number(process.env.PORT || 3000);
 
 // 只对 uiConfig 启用热更新
 const uiConfig = Array.isArray(config)
