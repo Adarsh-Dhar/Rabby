@@ -227,11 +227,14 @@ const SmartAutomations = () => {
         Automations
       </PageHeader>
 
-      <div className="bg-r-neutral-card rounded-8 p-16 mb-16">
-        <div className="text-r-neutral-title text-14 font-medium mb-12">
-          Execution mode
+      <div className="bg-r-neutral-card rounded-8 p-16 mb-16 border border-r-neutral-line">
+        <div className="flex items-center justify-between mb-12">
+          <div className="text-r-neutral-title text-14 font-medium">
+            Execution mode
+          </div>
+          <span className="text-r-neutral-foot text-12">How workflows run</span>
         </div>
-        <div className="flex justify-between items-center">
+        <div className="flex justify-between items-center gap-12">
           <span className="text-r-neutral-body text-13">
             {roleDelegation
               ? `Safe + Roles (configured: ${roleDelegation.safeAddress.slice(
@@ -363,7 +366,7 @@ const SmartAutomations = () => {
         ) : (
           <Row gutter={[16, 16]}>
             {workflows.map((workflow) => (
-              <Col key={workflow.workflowId} xs={24} sm={12} md={8} lg={6}>
+              <Col key={workflow.workflowId} xs={24} sm={12} lg={12}>
                 <ProjectCard
                   workflow={workflow}
                   onEdit={handleEditWorkflow}
