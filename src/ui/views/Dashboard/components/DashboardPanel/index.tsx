@@ -52,7 +52,7 @@ import {
   RcIconTransactionsCC,
   RcIconConvertDustCC,
   RcIconStakingCC,
-  RcIconLampCC,
+  RcIconAutomationCC,
 } from 'ui/assets/dashboard/panel';
 
 import { useThemeMode } from '@/ui/hooks/usePreference';
@@ -622,7 +622,7 @@ export const DashboardPanel: React.FC<{ onSettingClick?(): void }> = ({
       // isFullscreen: true,
     } as IPanelItem,
     smartAutomations: {
-      icon: RcIconLampCC,
+      icon: RcIconAutomationCC,
       eventKey: 'Automations',
       content: 'Automations',
       onClick: () => {
