@@ -389,13 +389,22 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
   return (
     <div className="flex min-h-0 flex-col h-full overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-16 py-12 border-b border-r-neutral-line flex-shrink-0">
-        <div className="flex items-center gap-12">
-          <h2 className="text-r-neutral-title text-16 font-medium">
-            {workflowId ? 'Edit Workflow' : 'New Workflow'}
+      <div className="flex items-center justify-between px-16 py-12 border-b border-r-neutral-line flex-shrink-0 bg-r-neutral-card">
+        <div className="min-w-0">
+          <h2 className="text-r-neutral-title text-16 font-medium truncate">
+            {workflowId ? 'Edit workflow' : 'New automation'}
           </h2>
+          <div className="text-r-neutral-foot text-12 mt-4">
+            Build the steps your wallet should run automatically
+          </div>
         </div>
-        <div className="flex items-center gap-8">
+        <div className="flex items-center gap-8 shrink-0 ml-12">
+          <Button
+            size="small"
+            onClick={onCancel}
+          >
+            Cancel
+          </Button>
           <Button
             type="primary"
             size="small"
@@ -405,14 +414,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
               !draftDefinition.name || draftDefinition.nodes.length === 0
             }
           >
-            Save
-          </Button>
-          <Button
-            size="small"
-            icon={<ThemeIcon src={RcIconClose} className="w-14 h-14" />}
-            onClick={onCancel}
-          >
-            Cancel
+            Save automation
           </Button>
         </div>
       </div>

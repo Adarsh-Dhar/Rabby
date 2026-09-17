@@ -212,19 +212,24 @@ const SmartAutomations = () => {
     <div className="p-20">
       <PageHeader
         canBack={false}
-        className="mb-12"
+        className="mb-16"
         rightSlot={
           <Button
             type="primary"
-            size="large"
+            size="middle"
             icon={<ThemeIcon src={RcIconPlus} className="w-12 h-12" />}
             onClick={handleCreateNew}
           >
-            New Automation
+            New automation
           </Button>
         }
       >
-        Automations
+        <div>
+          <div>Automations</div>
+          <div className="text-r-neutral-foot text-12 font-normal mt-4">
+            Create and manage wallet workflows
+          </div>
+        </div>
       </PageHeader>
 
       <div className="bg-r-neutral-card rounded-8 p-16 mb-16 border border-r-neutral-line">

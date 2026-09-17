@@ -84,7 +84,7 @@ export const ProjectCard: React.FC<ProjectCardProps> = ({
             <div className="text-r-neutral-foot text-12">{workflow.type}</div>
           </div>
           <div
-            className={`shrink-0 rounded-4 px-8 py-4 text-12 font-medium ${getStatusColor()}`}
+            className={`shrink-0 rounded-4 px-8 py-4 text-12 font-medium bg-r-neutral-card-1 ${getStatusColor()}`}
           >
             {getStatusText()}
           </div>
