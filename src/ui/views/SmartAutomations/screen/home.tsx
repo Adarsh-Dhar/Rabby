@@ -227,18 +227,34 @@ const SmartAutomations = () => {
         Automations
       </PageHeader>
 
-      <div className="bg-r-neutral-card rounded-8 p-16 mb-16">
-        <div className="text-r-neutral-title text-14 font-medium mb-12">
-          Execution mode
+      <div className="bg-r-neutral-card1 rounded-[10px] border border-solid border-rabby-neutral-line p-16 mb-16">
+        <div className="flex items-center justify-between mb-12">
+          <div className="text-r-neutral-title1 text-14 font-medium">
+            Execution mode
+          </div>
+          <span
+            className={`inline-flex items-center gap-4 rounded-full px-8 py-2 text-11 font-medium ${
+              roleDelegation
+                ? 'bg-r-green-light text-r-green-default'
+                : 'bg-r-neutral-card2 text-r-neutral-body'
+            }`}
+          >
+            <span
+              className={`w-6 h-6 rounded-full ${
+                roleDelegation ? 'bg-r-green-default' : 'bg-r-neutral-foot'
+              }`}
+            />
+            {roleDelegation ? 'Safe + Roles' : 'Direct (EOA)'}
+          </span>
         </div>
         <div className="flex justify-between items-center">
-          <span className="text-r-neutral-body text-13">
+          <span className="text-r-neutral-body text-13 truncate mr-8">
             {roleDelegation
-              ? `Safe + Roles (configured: ${roleDelegation.safeAddress.slice(
+              ? `Safe ${roleDelegation.safeAddress.slice(
                   0,
                   8
-                )}…)`
-              : 'Direct (EOA)'}
+                )}…${roleDelegation.safeAddress.slice(-4)}`
+              : 'Transactions are signed directly by this account'}
           </span>
           <Button
             size="small"
@@ -293,72 +309,103 @@ const SmartAutomations = () => {
         )}
       </div>
 
-      <div className="bg-r-neutral-card rounded-8 p-16 mb-16">
-        <div className="text-r-neutral-title text-14 font-medium mb-12">
-          Discovery — {selectedChain?.label || 'Select a chain'}
-        </div>
-        <div className="flex flex-col gap-12 text-13">
-          <div className="flex justify-between items-center">
-            <span className="text-r-neutral-body">Chain</span>
-            <Select
-              value={selectedChain?.label}
-              onChange={(value) => {
-                const chain = listVerifiedChains().find(
-                  (c) => c.label === value
-                );
-                if (chain) setSelectedChain(chain);
-              }}
-              className="w-48"
-              size="small"
-            >
-              {listVerifiedChains().map((chain) => (
-                <Select.Option key={chain.label} value={chain.label}>
-                  {chain.label}
-                </Select.Option>
-              ))}
-            </Select>
+      <div className="bg-r-neutral-card1 rounded-[10px] border border-solid border-rabby-neutral-line p-16 mb-16">
+        <div className="flex items-center justify-between mb-12">
+          <div className="text-r-neutral-title1 text-14 font-medium">
+            Discovery
           </div>
-
-          {selectedChain?.aaveV3Pool && (
-            <div className="flex justify-between">
-              <span className="text-r-neutral-body">Aave V3</span>
-              {healthFactorData.loading && (
-                <span className="text-r-neutral-foot">Loading…</span>
-              )}
-              {healthFactorData.error && (
-                <span className="text-r-red-default">Error</span>
-              )}
-              {!healthFactorData.loading && !healthFactorData.error && (
-                <span className="text-r-neutral-body">
-                  HF{' '}
-                  {healthFactorData.healthFactor === 0
-                    ? '—'
-                    : healthFactorData.healthFactor?.toFixed(2)}{' '}
-                  · Debt ${healthFactorData.totalDebtUSD?.toFixed(2)}
-                </span>
-              )}
-            </div>
-          )}
+          <Select
+            value={selectedChain?.label}
+            onChange={(value) => {
+              const chain = listVerifiedChains().find(
+                (c) => c.label === value
+              );
+              if (chain) setSelectedChain(chain);
+            }}
+            className="w-[140px]"
+            size="small"
+            placeholder="Select a chain"
+          >
+            {listVerifiedChains().map((chain) => (
+              <Select.Option key={chain.label} value={chain.label}>
+                {chain.label}
+              </Select.Option>
+            ))}
+          </Select>
         </div>
+
+        {selectedChain?.aaveV3Pool ? (
+          <div className="flex items-center justify-between rounded-8 bg-r-neutral-card2 px-12 py-10">
+            <span className="text-r-neutral-body text-13 font-medium">
+              Aave V3 position
+            </span>
+            {healthFactorData.loading && (
+              <span className="text-r-neutral-foot text-13">Loading…</span>
+            )}
+            {healthFactorData.error && (
+              <span className="text-r-red-default text-13">
+                Failed to load
+              </span>
+            )}
+            {!healthFactorData.loading && !healthFactorData.error && (
+              <div className="flex items-center gap-10 text-13">
+                <span
+                  className={`font-medium ${
+                    !healthFactorData.healthFactor
+                      ? 'text-r-neutral-foot'
+                      : healthFactorData.healthFactor < 1.25
+                      ? 'text-r-red-default'
+                      : healthFactorData.healthFactor < 1.5
+                      ? 'text-r-orange-default'
+                      : 'text-r-green-default'
+                  }`}
+                >
+                  HF{' '}
+                  {!healthFactorData.healthFactor
+                    ? '—'
+                    : healthFactorData.healthFactor.toFixed(2)}
+                </span>
+                <span className="text-r-neutral-foot">·</span>
+                <span className="text-r-neutral-body">
+                  Debt ${healthFactorData.totalDebtUSD?.toFixed(2)}
+                </span>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="text-r-neutral-foot text-13">
+            No supported lending markets on this chain.
+          </div>
+        )}
       </div>
 
       <div className="mb-16">
-        <h3 className="text-r-neutral-title text-16 font-medium mb-12">
-          Your Workflows
-        </h3>
+        <div className="flex items-center gap-8 mb-12">
+          <h3 className="text-r-neutral-title1 text-16 font-medium m-0">
+            Your Workflows
+          </h3>
+          {workflows.length > 0 && (
+            <span className="inline-flex items-center justify-center min-w-[20px] h-20 px-6 rounded-full bg-r-neutral-card2 text-r-neutral-body text-12 font-medium">
+              {workflows.length}
+            </span>
+          )}
+        </div>
         {workflows.length === 0 ? (
-          <div className="text-center text-r-neutral-foot py-32">
+          <div className="flex flex-col items-center text-center rounded-[10px] border border-dashed border-rabby-neutral-line py-40 px-20">
             <img
-              className="w-[100px] mx-auto mb-16"
+              className="w-[100px] mb-16"
               src="/images/nodata-tx.png"
               alt="no workflows"
             />
-            <div className="text-14 mb-8 text-r-neutral-body">
+            <div className="text-14 mb-8 text-r-neutral-body font-medium">
               No workflows yet
             </div>
-            <div className="text-12 text-r-neutral-foot">
+            <div className="text-12 text-r-neutral-foot mb-16">
               Create your first automation to get started
             </div>
+            <Button type="primary" onClick={handleCreateNew}>
+              New Automation
+            </Button>
           </div>
         ) : (
           <Row gutter={[16, 16]}>
