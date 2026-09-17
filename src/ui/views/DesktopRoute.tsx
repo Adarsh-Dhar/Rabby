@@ -19,6 +19,7 @@ import { useMemoizedFn } from 'ahooks';
 import { useContactBookStore } from '@/ui/state/contactBook';
 import { DesktopSmallSwap } from './DesktopSmallSwap';
 import { DesktopManageApprovals } from './DesktopManageApprovals';
+import SmartAutomations from './SmartAutomations/screen/home';
 
 declare global {
   interface Window {
@@ -66,6 +67,11 @@ const Main = () => {
       </PrivateRoute>
       <PrivateRoute exact path="/desktop/manage-approvals">
         <DesktopManageApprovals />
+      </PrivateRoute>
+      <PrivateRoute exact path="/desktop/smart-automations">
+        <PrivateRouteGuard>
+          <SmartAutomations />
+        </PrivateRouteGuard>
       </PrivateRoute>
       {hasMountedProfileRef.current ? (
         <PrivateRouteGuard>
