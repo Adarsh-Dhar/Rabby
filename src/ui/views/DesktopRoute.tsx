@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PrivateRoute, PrivateRouteGuard } from 'ui/component';
 
@@ -19,6 +19,7 @@ import { useMemoizedFn } from 'ahooks';
 import { useContactBookStore } from '@/ui/state/contactBook';
 import { DesktopSmallSwap } from './DesktopSmallSwap';
 import { DesktopManageApprovals } from './DesktopManageApprovals';
+const SmartAutomations = lazy(() => import('./SmartAutomations/screen/home'));
 
 declare global {
   interface Window {
@@ -66,6 +67,19 @@ const Main = () => {
       </PrivateRoute>
       <PrivateRoute exact path="/desktop/manage-approvals">
         <DesktopManageApprovals />
+      </PrivateRoute>
+      <PrivateRoute exact path="/desktop/smart-automations">
+        <PrivateRouteGuard>
+          <Suspense
+            fallback={
+              <div className="h-full flex items-center justify-center text-r-neutral-body text-14">
+                Loading Automations...
+              </div>
+            }
+          >
+            <SmartAutomations />
+          </Suspense>
+        </PrivateRouteGuard>
       </PrivateRoute>
       {hasMountedProfileRef.current ? (
         <PrivateRouteGuard>

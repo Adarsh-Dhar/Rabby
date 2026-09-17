@@ -24,7 +24,7 @@ interface NodeData {
 
 interface WorkflowNode {
   id: string;
-  type: 'trigger' | 'action' | 'condition';
+  type: 'trigger' | 'action' | 'condition' | 'forEach';
   data: NodeData;
   position?: { x: number; y: number };
 }

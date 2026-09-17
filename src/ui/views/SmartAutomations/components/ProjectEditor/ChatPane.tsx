@@ -108,7 +108,12 @@ export const ChatPane: React.FC<ChatPaneProps> = ({
 
   const handleKeyPress = useCallback(
     (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (
+        e.key === 'Enter' &&
+        !e.shiftKey &&
+        !e.nativeEvent.isComposing &&
+        e.keyCode !== 229
+      ) {
         e.preventDefault();
         handleSend();
       }
