@@ -1,4 +1,4 @@
-import React, { lazy, useEffect, useRef } from 'react';
+import React, { lazy, Suspense, useEffect, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PrivateRoute, PrivateRouteGuard } from 'ui/component';
 
@@ -70,7 +70,15 @@ const Main = () => {
       </PrivateRoute>
       <PrivateRoute exact path="/desktop/smart-automations">
         <PrivateRouteGuard>
-          <SmartAutomations />
+          <Suspense
+            fallback={
+              <div className="h-full flex items-center justify-center text-r-neutral-body text-14">
+                Loading Automations...
+              </div>
+            }
+          >
+            <SmartAutomations />
+          </Suspense>
         </PrivateRouteGuard>
       </PrivateRoute>
       {hasMountedProfileRef.current ? (

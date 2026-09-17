@@ -40,17 +40,11 @@ const SmartAutomations = () => {
   const load = useCallback(async () => {
     if (!account?.address) return;
     try {
-      console.log('Loading automations data for account:', account.address);
       const [keyStatus, list, delegation] = await Promise.all([
         wallet.getKeeperhubApiKeyStatus(),
         wallet.getKeeperhubWorkflows(account.address),
         wallet.getRoleDelegation(account.address),
       ]);
-      console.log('Automations data loaded:', {
-        keyStatus,
-        listLength: list.length,
-        hasDelegation: !!delegation,
-      });
       setHasApiKey(keyStatus);
       setWorkflows(list);
       if (delegation) {
